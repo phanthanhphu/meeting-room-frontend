@@ -1,5 +1,7 @@
-export const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080').replace(/\/$/, '');
-export const APP_EVENT_WS_URL = (import.meta.env.VITE_WS_BASE_URL || API_BASE_URL.replace(/^http/i, 'ws')) + '/ws/app-events';
+import { RUNTIME_NETWORK } from '../config/network.js';
+
+export const API_BASE_URL = RUNTIME_NETWORK.apiBaseUrl;
+export const APP_EVENT_WS_URL = RUNTIME_NETWORK.appEventWsUrl;
 const TOKEN_KEY = 'meetingRoomAuthToken';
 
 export const authStorage = {
