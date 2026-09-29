@@ -1,0 +1,13 @@
+import React,{useEffect,useMemo,useState} from 'react';
+import {Alert,Box,Button,Card,CardActions,CardContent,Chip,Grid,InputAdornment,TextField,Typography} from '@mui/material';
+import {LocationOnOutlined,PeopleOutline,SearchOutlined,EventAvailableOutlined} from '@mui/icons-material';
+import api,{errorMessage} from '../../api/client';
+import PageHeader from '../../components/PageHeader';
+import StatusBadge from '../../components/StatusBadge';
+import BookingDialog from '../../components/BookingDialog';
+export default function RoomsPage(){const [rooms,setRooms]=useState([]);const [q,setQ]=useState('');const [selected,setSelected]=useState(null);const [error,setError]=useState('');
+ const load=async()=>{try{setRooms((await api.get('/rooms')).data);setError('')}catch(e){setError(errorMessage(e))}};useEffect(()=>{load()},[]);
+ const filtered=useMemo(()=>rooms.filter(r=>`${r.code} ${r.name} ${r.location}`.toLowerCase().includes(q.toLowerCase())),[rooms,q]);
+ return <><PageHeader title="Meeting Rooms" subtitle="Find an available room and submit a booking request."/><TextField value={q} onChange={e=>setQ(e.target.value)} placeholder="Search room, code or location..." size="small" sx={{mb:3,width:{xs:'100%',sm:360}}} InputProps={{startAdornment:<InputAdornment position="start"><SearchOutlined/></InputAdornment>}}/>{error&&<Alert severity="error" sx={{mb:2}}>{error}</Alert>}
+ <Grid container spacing={2.5}>{filtered.map(r=><Grid item xs={12} sm={6} lg={4} key={r.id}><Card sx={{height:'100%',display:'flex',flexDirection:'column'}}><CardContent sx={{flexGrow:1}}><Box sx={{display:'flex',justifyContent:'space-between',gap:1,mb:2}}><Box><Typography variant="h6">{r.name}</Typography><Typography variant="caption" color="text.secondary">{r.code}</Typography></Box><StatusBadge status={r.status}/></Box><Typography color="text.secondary" sx={{display:'flex',gap:1,alignItems:'center',mb:1}}><LocationOnOutlined fontSize="small"/>{r.location}</Typography><Typography color="text.secondary" sx={{display:'flex',gap:1,alignItems:'center',mb:2}}><PeopleOutline fontSize="small"/>{r.capacity} people</Typography>{r.amenities&&<Box sx={{display:'flex',gap:.7,flexWrap:'wrap'}}>{r.amenities.split(',').map(x=><Chip key={x} label={x.trim()} size="small" variant="outlined"/>)}</Box>}</CardContent><CardActions sx={{p:2,pt:0}}><Button fullWidth variant="contained" startIcon={<EventAvailableOutlined/>} disabled={r.status!=='AVAILABLE'} onClick={()=>setSelected(r)}>Book this room</Button></CardActions></Card></Grid>)}</Grid>
+ <BookingDialog open={Boolean(selected)} onClose={()=>setSelected(null)} room={selected} rooms={rooms} onSaved={load}/></>}

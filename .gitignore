@@ -1,0 +1,17 @@
+node_modules/
+**/node_modules/
+
+dist/
+**/dist/
+
+build/
+**/build/
+
+.vite/
+**/.vite/
+
+.idea/
+**/.idea/
+
+.vscode/
+**/.vscode/
