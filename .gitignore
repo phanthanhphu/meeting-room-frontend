@@ -15,3 +15,11 @@ build/
 
 .vscode/
 **/.vscode/
+
+# =========================
+# Frontend deployment env
+# =========================
+# VITE_* values are public at build time. Keep the root .env in Git
+# so a fresh server pull can build the FE without recreating it.
+.env.*
+!.env
