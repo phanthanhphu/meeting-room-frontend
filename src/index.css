@@ -5,7 +5,7 @@
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   color: #172033;
-  background: #f4f7fb;
+  background: #f5f8fc;
 }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -15,3 +15,9 @@ body { margin: 0; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: 
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-thumb { background: #c9d4df; border-radius: 999px; }
 ::-webkit-scrollbar-track { background: transparent; }
+
+/* Consistent keyboard focus and reduced-motion support throughout the workspace. */
+:focus-visible { outline: 2px solid #3275cc; outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}

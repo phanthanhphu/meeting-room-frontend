@@ -13,6 +13,7 @@ import EventNoteOutlined from '@mui/icons-material/EventNoteOutlined';
 import FactCheckOutlined from '@mui/icons-material/FactCheckOutlined';
 import ManageAccountsOutlined from '@mui/icons-material/ManageAccountsOutlined';
 import SettingsSuggestOutlined from '@mui/icons-material/SettingsSuggestOutlined';
+import DevicesOtherOutlined from '@mui/icons-material/DevicesOtherOutlined';
 import AssessmentOutlined from '@mui/icons-material/AssessmentOutlined';
 import LogoutOutlined from '@mui/icons-material/LogoutOutlined';
 import NotificationsNoneOutlined from '@mui/icons-material/NotificationsNoneOutlined';
@@ -23,7 +24,7 @@ import logoYoungone from '../assets/svg/logos/logo-youngone.png';
 import { useAuth } from '../context/AuthContext';
 import { useAppData } from '../context/AppDataContext';
 
-const DRAWER_WIDTH = 236;
+const DRAWER_WIDTH = 246;
 const MINI_DRAWER_WIDTH = 68;
 const HEADER_HEIGHT = 64;
 
@@ -49,6 +50,7 @@ const items = [
   { title: 'Booking Calendar', path: '/calendar', icon: CalendarMonthOutlined, section: 'Booking' },
   { title: 'Approvals', path: '/approvals', icon: FactCheckOutlined, section: 'Management', roles: ['VIEWER', 'ROOM_MANAGER', 'ADMIN'] },
   { title: 'Room Management', path: '/room-management', icon: SettingsSuggestOutlined, section: 'Management', roles: ['VIEWER', 'ROOM_MANAGER', 'ADMIN'] },
+  { title: 'Equipment Catalog', path: '/equipment-management', icon: DevicesOtherOutlined, section: 'Management', roles: ['VIEWER', 'ROOM_MANAGER', 'ADMIN'] },
   { title: 'User Management', path: '/users', icon: ManageAccountsOutlined, section: 'Management', roles: ['ADMIN'] },
   { title: 'Reports', path: '/reports', icon: AssessmentOutlined, section: 'Management', roles: ['VIEWER', 'ROOM_MANAGER', 'ADMIN'] }
 ];
@@ -59,7 +61,8 @@ const pageMeta = {
   '/my-bookings': ['My Bookings', 'Booking Workspace'],
   '/calendar': ['Booking Calendar', 'Booking Workspace'],
   '/approvals': ['Approvals', 'Room Management'],
-  '/room-management': ['Room Management', 'Room Management'],
+  '/room-management': ['Room Management', 'Administration'],
+  '/equipment-management': ['Equipment Catalog', 'Administration'],
   '/users': ['User Management', 'Administration'],
   '/reports': ['Booking Reports', 'Room Management']
 };
@@ -121,7 +124,10 @@ export default function DashboardLayout() {
   const openNotification = async (item) => {
     if (!item.read) await markNotificationRead(item.id);
     setNotificationAnchorEl(null);
-    if (item.actionPath) navigate(item.actionPath);
+    if (item.actionPath) {
+      const path = item.actionPath.startsWith('/') ? item.actionPath : '/my-bookings';
+      navigate(item.entityType === 'BOOKING' && item.entityId ? `${path}${path.includes('?') ? '&' : '?'}booking=${encodeURIComponent(item.entityId)}` : path);
+    }
   };
 
   const drawer = (
@@ -165,7 +171,7 @@ export default function DashboardLayout() {
   );
 
   return (
-    <Box sx={{ display: 'flex', width: '100%', minHeight: '100vh', bgcolor: '#F4F7FB' }}>
+    <Box sx={{ display: 'flex', width: '100%', minHeight: '100vh', bgcolor: '#F5F8FC' }}>
       {!downLG ? (
         <Drawer
           variant="permanent"
@@ -290,7 +296,7 @@ export default function DashboardLayout() {
         </Alert>
       </Snackbar>
 
-      <Box component="main" sx={{ flexGrow: 1, width: downLG ? '100%' : `calc(100% - ${open ? DRAWER_WIDTH : MINI_DRAWER_WIDTH}px)`, p: { xs: 0.55, sm: 0.7, md: 0.85 }, transition: theme.transitions.create('width', { duration: 180 }) }}>
+      <Box component="main" sx={{ flexGrow: 1, width: downLG ? '100%' : `calc(100% - ${open ? DRAWER_WIDTH : MINI_DRAWER_WIDTH}px)`, p: { xs: 0.6, sm: 1, md: 1.5 }, transition: theme.transitions.create('width', { duration: 180 }) }}>
         <Toolbar sx={{ minHeight: `${HEADER_HEIGHT}px !important`, p: 0 }} />
         <Box sx={{ minHeight: 'calc(100vh - 72px)', display: 'flex', flexDirection: 'column' }}>
           <Box sx={{ flex: 1 }}><Outlet /></Box>

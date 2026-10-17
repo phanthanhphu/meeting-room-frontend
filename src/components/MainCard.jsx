@@ -5,11 +5,11 @@ export default function MainCard({ children, sx = {}, content = true }) {
     <Paper
       elevation={0}
       sx={{
-        border: '1px solid #E3EAF2',
-        borderRadius: 2.25,
+        border: '1px solid #E4EBF4',
+        borderRadius: 2.3,
         bgcolor: '#FFFFFF',
         overflow: 'hidden',
-        boxShadow: '0 4px 18px rgba(22, 56, 93, 0.035)',
+        boxShadow: '0 3px 14px rgba(22, 56, 93, 0.035)',
         ...(content ? { p: 1.5 } : {}),
         ...sx
       }}

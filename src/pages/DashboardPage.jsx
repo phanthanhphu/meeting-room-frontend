@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import dayjs from 'dayjs';
 import { Box, Button, Grid, Paper, Stack, TextField, Typography } from '@mui/material';
+import { useNavigate } from 'react-router-dom';
 import MeetingRoomOutlined from '@mui/icons-material/MeetingRoomOutlined';
 import EventAvailableOutlined from '@mui/icons-material/EventAvailableOutlined';
 import PendingActionsOutlined from '@mui/icons-material/PendingActionsOutlined';
@@ -9,6 +10,7 @@ import StarOutlineOutlined from '@mui/icons-material/StarOutlineOutlined';
 import RestartAltOutlined from '@mui/icons-material/RestartAltOutlined';
 import MainCard from '../components/MainCard';
 import PageHeader from '../components/PageHeader';
+import FilterToolbar from '../components/FilterToolbar';
 import StatusChip from '../components/StatusChip';
 import DataTable from '../components/DataTable';
 import { formatDate } from '../utils/date';
@@ -36,18 +38,22 @@ function SectionTitle({ title, subtitle }) {
   return <Box sx={{ px: 1.4, py: 1.05, borderBottom: '1px solid #E4EBF2' }}><Typography sx={{ fontSize: '.82rem', fontWeight: 800, color: '#173B63' }}>{title}</Typography>{subtitle && <Typography sx={{ mt: .12, fontSize: '.66rem', color: '#71849A' }}>{subtitle}</Typography>}</Box>;
 }
 
-function TrendChart({ rows }) {
+function TrendChart({ rows, endDate }) {
   const data = useMemo(() => {
     const counts = {};
     rows.forEach((row) => { counts[row.date] = (counts[row.date] || 0) + 1; });
-    return Object.entries(counts).sort(([a], [b]) => a.localeCompare(b)).slice(-14).map(([date, count]) => ({ date, count }));
-  }, [rows]);
+    const lastDay = endDate ? dayjs(endDate) : dayjs();
+    return Array.from({ length: 14 }, (_, i) => {
+      const date = lastDay.subtract(13 - i, 'day').format('YYYY-MM-DD');
+      return { date, count: counts[date] || 0 };
+    });
+  }, [rows, endDate]);
   const max = Math.max(1, ...data.map((item) => item.count));
   return (
     <Box sx={{ px: 1.5, pt: 1.2, pb: 1.25 }}>
       <Stack direction="row" alignItems="flex-end" spacing={.7} sx={{ height: 178, borderBottom: '1px solid #E5ECF3', backgroundImage: 'linear-gradient(to top, #EEF3F8 1px, transparent 1px)', backgroundSize: '100% 44px' }}>
         {data.map((item) => (
-          <TooltipBar key={item.date} label={`${formatDate(item.date)}: ${item.count} booking${item.count > 1 ? 's' : ''}`} height={`${Math.max(10, (item.count / max) * 150)}px`} />
+          <TooltipBar key={item.date} label={`${formatDate(item.date)}: ${item.count} booking${item.count > 1 ? 's' : ''}`} height={`${item.count === 0 ? 2 : Math.max(10, (item.count / max) * 150)}px`} />
         ))}
       </Stack>
       <Stack direction="row" justifyContent="space-between" sx={{ mt: .55 }}>
@@ -77,21 +83,26 @@ function StatusDonut({ rows }) {
   const total = Math.max(1, rows.length);
   const approved = counts.APPROVED || 0;
   const pending = counts.PENDING || 0;
-  const rejected = counts.REJECTED || 0;
-  const a = approved / total * 360;
-  const p = pending / total * 360;
-  return <Stack direction="row" alignItems="center" spacing={2} sx={{ p: 1.5 }}><Box sx={{ width: 118, height: 118, borderRadius: '50%', background: `conic-gradient(#2CA87F 0deg ${a}deg,#E58A00 ${a}deg ${a + p}deg,#DC2626 ${a + p}deg 360deg)`, display: 'grid', placeItems: 'center', flex: '0 0 auto' }}><Box sx={{ width: 72, height: 72, bgcolor: '#FFF', borderRadius: '50%', display: 'grid', placeItems: 'center' }}><Box sx={{ textAlign: 'center' }}><Typography sx={{ fontSize: '1.15rem', fontWeight: 800, color: '#173B63' }}>{rows.length}</Typography><Typography sx={{ fontSize: '.58rem', color: '#71849A' }}>Bookings</Typography></Box></Box></Box><Stack spacing={.9}>{[['Approved', approved, '#2CA87F'], ['Pending', pending, '#E58A00'], ['Rejected', rejected, '#DC2626']].map(([label, count, color]) => <Stack key={label} direction="row" spacing={.7} alignItems="center"><Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: color }} /><Typography sx={{ fontSize: '.68rem', color: '#536A80', minWidth: 55 }}>{label}</Typography><Typography sx={{ fontSize: '.7rem', fontWeight: 800, color: '#173B63' }}>{count}</Typography></Stack>)}</Stack></Stack>;
+  const segments = [
+    ['Approved', approved, '#2CA87F'], ['Completed', counts.COMPLETED || 0, '#2563EB'],
+    ['Pending', pending, '#E58A00'], ['Rejected', counts.REJECTED || 0, '#DC2626'],
+    ['Cancelled', counts.CANCELLED || 0, '#8496A8']
+  ];
+  let angle = 0;
+  const gradient = segments.map(([, count, color]) => { const start = angle; angle += count / total * 360; return `${color} ${start}deg ${angle}deg`; }).join(',');
+  return <Stack direction={{ xs: 'column', sm: 'row' }} alignItems="center" spacing={2} sx={{ p: 1.5 }}><Box sx={{ width: 118, height: 118, borderRadius: '50%', background: rows.length ? `conic-gradient(${gradient})` : '#E5ECF3', display: 'grid', placeItems: 'center', flex: '0 0 auto' }}><Box sx={{ width: 72, height: 72, bgcolor: '#FFF', borderRadius: '50%', display: 'grid', placeItems: 'center' }}><Box sx={{ textAlign: 'center' }}><Typography sx={{ fontSize: '1.15rem', fontWeight: 800, color: '#173B63' }}>{rows.length}</Typography><Typography sx={{ fontSize: '.58rem', color: '#71849A' }}>Bookings</Typography></Box></Box></Box><Stack spacing={.65}>{segments.map(([label, count, color]) => <Stack key={label} direction="row" spacing={.7} alignItems="center"><Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: color }} /><Typography sx={{ fontSize: '.68rem', color: '#536A80', minWidth: 72 }}>{label}</Typography><Typography sx={{ fontSize: '.7rem', fontWeight: 800, color: '#173B63' }}>{count}</Typography></Stack>)}</Stack></Stack>;
 }
 
 export default function DashboardPage() {
+  const navigate = useNavigate();
   const { user, canViewAllBookings } = useAuth();
-  const { bookings, rooms } = useAppData();
+  const { loading, bookings, rooms } = useAppData();
   const [fromDate, setFromDate] = useState(() => dayjs().startOf('month').format('YYYY-MM-DD'));
   const [toDate, setToDate] = useState(() => dayjs().endOf('month').format('YYYY-MM-DD'));
 
   const scopedBookings = useMemo(() => canViewAllBookings ? bookings : bookings.filter((row) => row.userId ? row.userId === user?.id : row.user === user?.fullName), [bookings, canViewAllBookings, user]);
   const filtered = useMemo(() => scopedBookings.filter((row) => (!fromDate || row.date >= fromDate) && (!toDate || row.date <= toDate)), [scopedBookings, fromDate, toDate]);
-  const approvedPeriodRows = useMemo(() => filtered.filter((row) => row.status === 'APPROVED'), [filtered]);
+  const approvedPeriodRows = useMemo(() => filtered.filter((row) => ['APPROVED', 'COMPLETED'].includes(row.status)), [filtered]);
   const roomCounts = useMemo(() => approvedPeriodRows.reduce((acc, row) => ({ ...acc, [row.room]: (acc[row.room] || 0) + 1 }), {}), [approvedPeriodRows]);
   const userCounts = useMemo(() => approvedPeriodRows.reduce((acc, row) => ({ ...acc, [row.user]: (acc[row.user] || 0) + 1 }), {}), [approvedPeriodRows]);
   const topRoom = Object.entries(roomCounts).sort((a, b) => b[1] - a[1])[0] || ['-', 0];
@@ -99,47 +110,48 @@ export default function DashboardPage() {
   const usedRooms = Object.keys(roomCounts).length;
   const pending = filtered.filter((row) => row.status === 'PENDING').length;
   const approved = approvedPeriodRows.length;
+  const invalidDateRange = Boolean(fromDate && toDate && fromDate > toDate);
 
   return <Box sx={{ p: .55 }}>
-    <PageHeader title="Meeting Room Dashboard" subtitle={canViewAllBookings ? "Global booking statistics and room usage overview" : "Your booking statistics and room usage overview"} />
+    <PageHeader title="Meeting Room Dashboard"
+      subtitle={canViewAllBookings ? 'Monitor approvals, booking activity and room usage at a glance.' : 'Your meetings, room usage and booking requests in one view.'}
+      actions={<Button onClick={() => navigate('/rooms')} startIcon={<MeetingRoomOutlined />} variant="contained">Browse rooms</Button>} />
 
     <MainCard sx={{ mb: 1.1 }}>
-      <Stack direction={{ xs: 'column', md: 'row' }} alignItems={{ xs: 'stretch', md: 'center' }} justifyContent="space-between" spacing={1}>
-        <Box><Typography sx={{ fontSize: '.75rem', fontWeight: 800, color: '#334E68' }}>Dashboard Date Filter</Typography><Typography sx={{ mt: .15, fontSize: '.64rem', color: '#71849A' }}>All statistics and charts below follow this date range.</Typography></Box>
-        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={.75} alignItems={{ xs: 'stretch', sm: 'center' }}>
-          <TextField label="From date" type="date" size="small" value={fromDate} onChange={(e) => setFromDate(e.target.value)} InputLabelProps={{ shrink: true }} sx={{ width: { sm: 165 }, '& .MuiOutlinedInput-root': { height: 36 } }} />
-          <TextField label="To date" type="date" size="small" value={toDate} onChange={(e) => setToDate(e.target.value)} InputLabelProps={{ shrink: true }} sx={{ width: { sm: 165 }, '& .MuiOutlinedInput-root': { height: 36 } }} />
-          <Button size="small" variant="outlined" startIcon={<RestartAltOutlined />} onClick={() => { setFromDate(dayjs().startOf('month').format('YYYY-MM-DD')); setToDate(dayjs().endOf('month').format('YYYY-MM-DD')); }}>This month</Button>
-        </Stack>
-      </Stack>
+      <Box sx={{ mb: 1.1 }}><Typography sx={{ fontSize: '.77rem', fontWeight: 800, color: '#334E68' }}>Dashboard Date Filter</Typography><Typography sx={{ mt: .15, fontSize: '.68rem', color: '#71849A' }}>All statistics and charts below follow this date range.</Typography></Box>
+      <FilterToolbar actions={<Button size="small" variant="outlined" startIcon={<RestartAltOutlined />} onClick={() => { setFromDate(dayjs().startOf('month').format('YYYY-MM-DD')); setToDate(dayjs().endOf('month').format('YYYY-MM-DD')); }}>This month</Button>}>
+        <TextField label="From date" type="date" size="small" value={fromDate} onChange={(e) => setFromDate(e.target.value)} InputLabelProps={{ shrink: true }} />
+        <TextField label="To date" type="date" size="small" value={toDate} onChange={(e) => setToDate(e.target.value)} InputLabelProps={{ shrink: true }} />
+      </FilterToolbar>
     </MainCard>
 
+    {invalidDateRange && <Typography color="error" sx={{ mb: 1 }}>From date must not be later than to date.</Typography>}
     <Grid container spacing={1.05}>
-      <Grid item xs={12} sm={6} lg={2.4}><Kpi label="Bookings" value={filtered.length} helper={`${approved} approved`} icon={EventAvailableOutlined} tone="#4680FF" /></Grid>
+      <Grid item xs={12} sm={6} lg={2.4}><Kpi label="Bookings" value={filtered.length} helper={`${approved} approved / completed`} icon={EventAvailableOutlined} tone="#4680FF" /></Grid>
       <Grid item xs={12} sm={6} lg={2.4}><Kpi label="Rooms Used" value={`${usedRooms}/${rooms.length}`} helper="Rooms in selected period" icon={MeetingRoomOutlined} tone="#2CA87F" /></Grid>
-      <Grid item xs={12} sm={6} lg={2.4}><Kpi label={canViewAllBookings ? 'Top Booker' : 'My Approved'} value={canViewAllBookings ? topUser[0] : approved} helper={canViewAllBookings ? `${topUser[1]} approved meetings` : `${pending} pending`} icon={PersonOutlineOutlined} tone="#7C3AED" /></Grid>
-      <Grid item xs={12} sm={6} lg={2.4}><Kpi label="Top Room" value={topRoom[0]} helper={`${topRoom[1]} approved meetings`} icon={StarOutlineOutlined} tone="#3EC9D6" /></Grid>
+      <Grid item xs={12} sm={6} lg={2.4}><Kpi label={canViewAllBookings ? 'Top Booker' : 'My Approved'} value={canViewAllBookings ? topUser[0] : approved} helper={canViewAllBookings ? `${topUser[1]} held / approved meetings` : `${pending} pending`} icon={PersonOutlineOutlined} tone="#7C3AED" /></Grid>
+      <Grid item xs={12} sm={6} lg={2.4}><Kpi label="Top Room" value={topRoom[0]} helper={`${topRoom[1]} held / approved meetings`} icon={StarOutlineOutlined} tone="#3EC9D6" /></Grid>
       <Grid item xs={12} sm={6} lg={2.4}><Kpi label="Pending" value={pending} helper="Waiting for approval" icon={PendingActionsOutlined} tone="#E58A00" /></Grid>
     </Grid>
 
     <Grid container spacing={1.05} sx={{ mt: .05 }}>
       <Grid item xs={12} lg={7}>
-        <MainCard content={false} sx={{ height: '100%' }}><SectionTitle title="Booking Trend" subtitle="Number of booking requests by date" /><TrendChart rows={filtered} /></MainCard>
+        <MainCard content={false} sx={{ height: '100%' }}><SectionTitle title="Booking Trend" subtitle="Last 14 days ending on selected To date; includes zero-booking days" /><TrendChart rows={filtered} endDate={toDate} /></MainCard>
       </Grid>
       <Grid item xs={12} lg={5}>
-        <MainCard content={false} sx={{ height: '100%' }}><SectionTitle title="Room Usage" subtitle="Approved meetings by room" /><RoomUsageChart rows={approvedPeriodRows} /></MainCard>
+        <MainCard content={false} sx={{ height: '100%' }}><SectionTitle title="Room Usage" subtitle="Approved + completed meetings by room" /><RoomUsageChart rows={approvedPeriodRows} /></MainCard>
       </Grid>
       <Grid item xs={12} lg={5}>
-        <MainCard content={false} sx={{ height: '100%' }}><SectionTitle title="Approval Status" subtitle="Approved, pending and rejected requests" /><StatusDonut rows={filtered} /></MainCard>
+        <MainCard content={false} sx={{ height: '100%' }}><SectionTitle title="Approval Status" subtitle="All five booking statuses" /><StatusDonut rows={filtered} /></MainCard>
       </Grid>
       <Grid item xs={12} lg={7}>
         <MainCard content={false} sx={{ height: '100%' }}>
-          <SectionTitle title="Bookings in Selected Period" subtitle="Approved meetings only" />
+          <SectionTitle title="Bookings in Selected Period" subtitle="Approved and completed meetings" />
           <DataTable
+        loading={loading}
             rows={approvedPeriodRows}
             initialPageSize={5}
             searchFields={[
-              { key: 'id', label: 'Booking ID' },
               { key: 'title', label: 'Meeting' },
               { key: 'user', label: 'Booked By' }
             ]}
@@ -147,7 +159,6 @@ export default function DashboardPage() {
               { key: 'room', label: 'Room', options: [...new Set(approvedPeriodRows.map((row) => row.room))] }
             ]}
             columns={[
-              { key: 'id', label: 'Booking ID' },
               { key: 'title', label: 'Meeting' },
               { key: 'user', label: 'Booked By' },
               { key: 'room', label: 'Room' },

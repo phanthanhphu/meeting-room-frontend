@@ -18,6 +18,7 @@ import {
   Typography
 } from '@mui/material';
 import SearchOutlined from '@mui/icons-material/SearchOutlined';
+import FilterToolbar from './FilterToolbar';
 import RestartAltOutlined from '@mui/icons-material/RestartAltOutlined';
 import ArrowDropUpOutlined from '@mui/icons-material/ArrowDropUpOutlined';
 import ArrowDropDownOutlined from '@mui/icons-material/ArrowDropDownOutlined';
@@ -39,7 +40,8 @@ export default function DataTable({
   pageSizeOptions = [5, 10, 20, 50],
   initialPageSize = 10,
   toolbarRight,
-  dense = true
+  dense = true,
+  loading = false
 }) {
   const [draftSearchValues, setDraftSearchValues] = useState({});
   const [appliedSearchValues, setAppliedSearchValues] = useState({});
@@ -96,7 +98,8 @@ export default function DataTable({
     return result;
   }, [rows, effectiveSearchFields, appliedSearchValues, effectiveFilters, appliedFilterValues, sortKey, sortDirection]);
 
-  const visibleRows = useMemo(() => filteredRows.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage), [filteredRows, page, rowsPerPage]);
+  const effectivePage = Math.min(page, Math.max(0, Math.ceil(filteredRows.length / rowsPerPage) - 1));
+  const visibleRows = useMemo(() => filteredRows.slice(effectivePage * rowsPerPage, effectivePage * rowsPerPage + rowsPerPage), [filteredRows, effectivePage, rowsPerPage]);
 
   const applySearch = () => {
     setAppliedSearchValues({ ...draftSearchValues });
@@ -135,50 +138,42 @@ export default function DataTable({
   return (
     <Box>
       {hasSearchToolbar && (
-        <Stack spacing={1} sx={{ px: 1.25, py: 1.1, borderBottom: '1px solid #DFE7EF', bgcolor: '#FFFFFF' }}>
-          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={0.8} sx={{ flexWrap: 'wrap' }}>
-            {effectiveSearchFields.map((field) => (
-              <TextField
-                key={field.key}
-                size="small"
-                label={field.label}
-                value={draftSearchValues[field.key] || ''}
-                onChange={(event) => setDraftSearchValues((current) => ({ ...current, [field.key]: event.target.value }))}
-                onKeyDown={(event) => { if (event.key === 'Enter') applySearch(); }}
-                sx={{ width: { xs: '100%', sm: field.width || 180 }, '& .MuiOutlinedInput-root': { height: 36, bgcolor: '#FFF' }, '& .MuiInputLabel-root': { fontSize: '.72rem' } }}
-              />
-            ))}
-            {effectiveFilters.map((filter) => (
-              <FormControl size="small" key={filter.key} sx={{ minWidth: filter.width || 155 }}>
-                <Select
-                  displayEmpty
-                  value={draftFilterValues[filter.key] || ''}
-                  onChange={(event) => setDraftFilterValues((current) => ({ ...current, [filter.key]: event.target.value }))}
-                  sx={{ height: 36, bgcolor: '#FFF', fontSize: '.72rem' }}
-                >
-                  <MenuItem value="">All {filter.label}</MenuItem>
-                  {(filter.options || []).map((option) => {
-                    const value = typeof option === 'object' ? option.value : option;
-                    const label = typeof option === 'object' ? option.label : option;
-                    return <MenuItem value={value} key={value}>{label}</MenuItem>;
-                  })}
-                </Select>
-              </FormControl>
-            ))}
+        <FilterToolbar sx={{ px: 1.4, py: 1.3, borderBottom: '1px solid #DFE7EF', bgcolor: '#FFFFFF' }}
+          actions={<>
             {(effectiveSearchFields.length > 0 || effectiveFilters.length > 0) && <>
-              <Button size="small" variant="contained" startIcon={<SearchOutlined />} onClick={applySearch} sx={{ height: 36, px: 1.6 }}>Search</Button>
-              <Button size="small" variant="outlined" startIcon={<RestartAltOutlined />} onClick={resetSearch} sx={{ height: 36, px: 1.4 }}>Reset Search</Button>
+              <Button size="small" variant="contained" startIcon={<SearchOutlined />} onClick={applySearch}>Search</Button>
+              <Button size="small" variant="outlined" startIcon={<RestartAltOutlined />} onClick={resetSearch}>Reset</Button>
             </>}
-          </Stack>
-          <Stack direction="row" alignItems="center" spacing={1} justifyContent="flex-end">
-            <Typography sx={{ fontSize: '.68rem', color: '#71849A', whiteSpace: 'nowrap' }}>{filteredRows.length} record{filteredRows.length === 1 ? '' : 's'}</Typography>
             {toolbarRight}
-          </Stack>
-        </Stack>
+          </>}
+          summary={<Typography sx={{ fontSize: '.7rem', color: '#71849A' }}>{filteredRows.length} record{filteredRows.length === 1 ? '' : 's'}</Typography>}>
+          {effectiveSearchFields.map((field) => (
+            <TextField key={field.key} size="small" label={field.label}
+              value={draftSearchValues[field.key] || ''}
+              onChange={(event) => setDraftSearchValues((current) => ({ ...current, [field.key]: event.target.value }))}
+              onKeyDown={(event) => { if (event.key === 'Enter') applySearch(); }}
+              sx={{ minWidth: { sm: field.width || 150 }, '& .MuiOutlinedInput-root': { height: 36 }, '& .MuiInputLabel-root': { fontSize: '.72rem' } }} />
+          ))}
+          {effectiveFilters.map((filter) => (
+            <FormControl size="small" key={filter.key} sx={{ minWidth: filter.width || 145 }}>
+              <Select displayEmpty value={draftFilterValues[filter.key] || ''}
+                onChange={(event) => setDraftFilterValues((current) => ({ ...current, [filter.key]: event.target.value }))}
+                sx={{ height: 36, bgcolor: '#FFF', fontSize: '.72rem' }}>
+                <MenuItem value="">All {filter.label}</MenuItem>
+                {(filter.options || []).map((option) => {
+                  const value = typeof option === 'object' ? option.value : option;
+                  const label = typeof option === 'object' ? option.label : option;
+                  return <MenuItem value={value} key={value}>{label}</MenuItem>;
+                })}
+              </Select>
+            </FormControl>
+          ))}
+        </FilterToolbar>
       )}
 
-      <TableContainer sx={{ overflowX: 'auto' }}>
-        <Table size={dense ? 'small' : 'medium'} sx={{ minWidth: 850, borderCollapse: 'separate', borderSpacing: 0, borderLeft: '1px solid #DFE7EF', borderTop: '1px solid #DFE7EF' }}>
+      <Typography sx={{ display: { xs: 'block', md: 'none' }, px: 1.5, py: .7, color: 'text.secondary', fontSize: '.75rem' }}>Swipe horizontally to view all table columns.</Typography>
+      <TableContainer sx={{ overflowX: 'auto', maxHeight: 570, minHeight: 250 }}>
+        <Table stickyHeader size={dense ? 'small' : 'medium'} sx={{ minWidth: 850, borderCollapse: 'separate', borderSpacing: 0, borderLeft: '1px solid #DFE7EF', borderTop: '1px solid #DFE7EF' }}>
           <TableHead>
             <TableRow>
               <TableCell align="center" sx={{ width: 58, whiteSpace: 'nowrap', borderRight: '1px solid #DFE7EF !important', borderBottom: '1px solid #D7E1EB !important', py: .9, fontWeight: 800 }}>No.</TableCell>
@@ -205,9 +200,9 @@ export default function DataTable({
             </TableRow>
           </TableHead>
           <TableBody>
-            {visibleRows.map((row, index) => (
-              <TableRow key={getKey(row, page * rowsPerPage + index)} hover>
-                <TableCell align="center" sx={{ width: 58, borderRight: '1px solid #E2E9F0 !important', borderBottom: '1px solid #E2E9F0 !important', py: .78, bgcolor: '#FFF', fontWeight: 700, color: '#61758B' }}>{page * rowsPerPage + index + 1}</TableCell>
+            {!loading && visibleRows.map((row, index) => (
+              <TableRow key={getKey(row, effectivePage * rowsPerPage + index)} hover>
+                <TableCell align="center" sx={{ width: 58, borderRight: '1px solid #E2E9F0 !important', borderBottom: '1px solid #E2E9F0 !important', py: .78, bgcolor: '#FFF', fontWeight: 700, color: '#61758B' }}>{effectivePage * rowsPerPage + index + 1}</TableCell>
                 {columns.map((column) => (
                   <TableCell
                     key={column.key}
@@ -219,10 +214,10 @@ export default function DataTable({
                 ))}
               </TableRow>
             ))}
-            {!visibleRows.length && (
+            {(loading || !visibleRows.length) && (
               <TableRow>
                 <TableCell colSpan={columns.length + 1} sx={{ borderRight: '1px solid #E2E9F0 !important', borderBottom: '1px solid #E2E9F0 !important' }}>
-                  <Box sx={{ py: 4.5, textAlign: 'center' }}><Typography color="text.secondary" sx={{ fontSize: '.76rem' }}>No matching data</Typography></Box>
+                  <Box sx={{ py: 4.5, textAlign: 'center' }}><Typography color="text.secondary" sx={{ fontSize: '.76rem' }}>{loading ? 'Loading records...' : (rows.length ? 'No matching records for the selected filters.' : 'No records yet.')}</Typography></Box>
                 </TableCell>
               </TableRow>
             )}
@@ -233,7 +228,7 @@ export default function DataTable({
       <TablePagination
         component="div"
         count={filteredRows.length}
-        page={Math.min(page, Math.max(0, Math.ceil(filteredRows.length / rowsPerPage) - 1))}
+        page={effectivePage}
         onPageChange={(_, nextPage) => setPage(nextPage)}
         rowsPerPage={rowsPerPage}
         onRowsPerPageChange={(event) => { setRowsPerPage(Number(event.target.value)); setPage(0); }}

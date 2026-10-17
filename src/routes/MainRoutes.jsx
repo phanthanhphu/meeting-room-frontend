@@ -6,6 +6,7 @@ import MyBookingsPage from '../pages/MyBookingsPage';
 import CalendarPage from '../pages/CalendarPage';
 import ApprovalsPage from '../pages/ApprovalsPage';
 import RoomManagementPage from '../pages/RoomManagementPage';
+import EquipmentManagementPage from '../pages/EquipmentManagementPage';
 import UserManagementPage from '../pages/UserManagementPage';
 import ReportsPage from '../pages/ReportsPage';
 import { RequireAdmin, RequireAuth, RequireRoles } from '../components/RequireRole';
@@ -19,6 +20,7 @@ export default function MainRoutes() {
     <Route path="calendar" element={<CalendarPage />} />
     <Route path="approvals" element={<RequireRoles roles={['VIEWER', 'ROOM_MANAGER', 'ADMIN']}><ApprovalsPage /></RequireRoles>} />
     <Route path="room-management" element={<RequireRoles roles={['VIEWER', 'ROOM_MANAGER', 'ADMIN']}><RoomManagementPage /></RequireRoles>} />
+    <Route path="equipment-management" element={<RequireRoles roles={['VIEWER', 'ROOM_MANAGER', 'ADMIN']}><EquipmentManagementPage /></RequireRoles>} />
     <Route path="users" element={<RequireAdmin><UserManagementPage /></RequireAdmin>} />
     <Route path="reports" element={<RequireRoles roles={['VIEWER', 'ROOM_MANAGER', 'ADMIN']}><ReportsPage /></RequireRoles>} />
   </Route>;

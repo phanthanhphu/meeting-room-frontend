@@ -4,6 +4,7 @@ const MAP = {
   APPROVED: { color: '#107D4F', bg: '#EAF8F2', border: '#BFE8D7' },
   PENDING: { color: '#B56B00', bg: '#FFF7E8', border: '#F4D7A3' },
   REJECTED: { color: '#B42318', bg: '#FFF1F0', border: '#F5C5C0' },
+  COMPLETED: { color: '#235FBC', bg: '#EDF4FF', border: '#C8DAF9' },
   CANCELLED: { color: '#61758B', bg: '#F3F6F8', border: '#DDE5EC' },
   ACTIVE: { color: '#107D4F', bg: '#EAF8F2', border: '#BFE8D7' },
   MAINTENANCE: { color: '#B56B00', bg: '#FFF7E8', border: '#F4D7A3' },

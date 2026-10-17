@@ -51,6 +51,12 @@ export const globalApi = {
     update: (id, payload) => request(`/api/rooms/${id}`, { method: 'PUT', body: jsonBody(payload) }),
     delete: (id) => request(`/api/rooms/${id}`, { method: 'DELETE' })
   },
+  equipment: {
+    list: () => request('/api/equipment'),
+    create: (payload) => request('/api/equipment', { method: 'POST', body: jsonBody(payload) }),
+    update: (id, payload) => request(`/api/equipment/${id}`, { method: 'PUT', body: jsonBody(payload) }),
+    delete: (id) => request(`/api/equipment/${id}`, { method: 'DELETE' })
+  },
   bookings: {
     mine: () => request('/api/bookings/mine'),
     get: (id) => request(`/api/bookings/${id}`),
