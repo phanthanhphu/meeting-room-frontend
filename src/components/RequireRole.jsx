@@ -1,3 +1,4 @@
+import { ROLES, ACCESS_ROLES } from '../constants/access.js';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
@@ -13,10 +14,10 @@ export function RequireRoles({ roles, children }) {
   const { user, isAuthenticated, loading } = useAuth();
   if (loading) return null;
   if (!isAuthenticated) return <Navigate to="/login" replace />;
-  if (!roles.includes(user?.role)) return <Navigate to="/dashboard" replace />;
+  if (!roles.includes(user?.role)) return <Navigate to={user?.role === ROLES.ADMIN ? '/dashboard' : '/rooms'} replace />;
   return children;
 }
 
 export function RequireAdmin({ children }) {
-  return <RequireRoles roles={['ADMIN']}>{children}</RequireRoles>;
+  return <RequireRoles roles={ACCESS_ROLES.USERS}>{children}</RequireRoles>;
 }

@@ -1,3 +1,5 @@
+import { BOOKING_FILTER_OPTIONS, BOOKING_STATUS } from '../constants/statuses.js';
+import { canCancelBooking } from '../utils/bookingRules.js';
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, Stack, TextField, Typography } from '@mui/material';
@@ -17,8 +19,9 @@ import { useAuth } from '../context/AuthContext';
 
 export default function ApprovalsPage() {
   const { canManageBookings } = useAuth();
-  const { loading, bookings, approveBooking, rejectBooking } = useAppData();
+  const { loading, bookings, approveBooking, rejectBooking, cancelBooking } = useAppData();
   const [rejectTarget, setRejectTarget] = useState(null);
+  const [cancelTarget, setCancelTarget] = useState(null);
   const [viewTarget, setViewTarget] = useState(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const [reason, setReason] = useState('');
@@ -50,7 +53,7 @@ export default function ApprovalsPage() {
           { key: 'user', label: 'Requested By' }
         ]}
         filters={[
-          { key: 'status', label: 'Status', options: ['PENDING', 'APPROVED', 'COMPLETED', 'REJECTED', 'CANCELLED'] },
+          { key: 'status', label: 'Status', options: BOOKING_FILTER_OPTIONS },
           { key: 'department', label: 'Department', options: [...new Set(bookings.map((row) => row.department))] },
           { key: 'room', label: 'Room', options: [...new Set(bookings.map((row) => row.room))] }
         ]}
@@ -61,7 +64,8 @@ export default function ApprovalsPage() {
           { key: 'participants', label: 'People', align: 'center' }, { key: 'status', label: 'Status', render: (row) => <StatusChip value={row.status} /> },
           { key: 'actions', label: 'Actions', align: 'right', sortable: false, render: (row) => <Stack direction="row" justifyContent="flex-end" spacing={.5}>
             <Button size="small" variant="text" startIcon={<VisibilityOutlined />} onClick={() => setViewTarget(row)}>View</Button>
-            {canManageBookings && row.status === 'PENDING' && <><Button size="small" variant="outlined" color="error" startIcon={<CloseOutlined />} disabled={Boolean(busyId)} onClick={() => { setReason(''); setRejectTarget(row); }}>Reject</Button><Button size="small" variant="contained" color="success" startIcon={<CheckOutlined />} disabled={Boolean(busyId) || !canChangeBooking(row)} onClick={() => setApproving(row)}>Approve</Button></>}
+            {canManageBookings && canCancelBooking(row, { isManager: true }) && row.status === BOOKING_STATUS.APPROVED && <Button size="small" variant="outlined" color="warning" onClick={() => setCancelTarget(row)}>Cancel</Button>}
+            {canManageBookings && row.status === BOOKING_STATUS.PENDING && <><Button size="small" variant="outlined" color="error" startIcon={<CloseOutlined />} disabled={Boolean(busyId)} onClick={() => { setReason(''); setRejectTarget(row); }}>Reject</Button><Button size="small" variant="contained" color="success" startIcon={<CheckOutlined />} disabled={Boolean(busyId) || !canChangeBooking(row)} onClick={() => setApproving(row)}>Approve</Button></>}
           </Stack> }
         ]}
       />
@@ -71,7 +75,8 @@ export default function ApprovalsPage() {
 
     <Dialog open={Boolean(viewTarget)} onClose={() => setViewTarget(null)} fullWidth maxWidth="sm"><DialogTitle sx={{ fontSize: '.95rem', fontWeight: 800 }}>Booking Details</DialogTitle><DialogContent dividers>{viewTarget && <Stack spacing={.75}>{[
       ['Meeting', viewTarget.title], ['Requester', viewTarget.user], ['Department', viewTarget.department], ['Room', viewTarget.room], ['Date', formatDate(viewTarget.date)], ['Time', viewTarget.time], ['People', viewTarget.participants], ['Status', viewTarget.status], ['Reject Reason', viewTarget.rejectReason || '-']
-    ].map(([label, value]) => <Stack key={label} direction="row" justifyContent="space-between"><Typography sx={{ fontSize: '.72rem', color: '#71849A' }}>{label}</Typography><Typography sx={{ fontSize: '.72rem', fontWeight: 700, color: '#314A65' }}>{value}</Typography></Stack>)}</Stack>}<BookingHistory bookingId={viewTarget?.id} /></DialogContent><DialogActions><Button onClick={() => setViewTarget(null)}>Close</Button></DialogActions></Dialog>
+    ].map(([label, value]) => <Stack key={label} direction="row" justifyContent="space-between"><Typography sx={{ fontSize: '.72rem', color: '#71849A' }}>{label}</Typography><Typography sx={{ fontSize: '.72rem', fontWeight: 700, color: '#314A65' }}>{value}</Typography></Stack>)}</Stack>}<BookingHistory bookingId={viewTarget?.id} /></DialogContent><DialogActions><Button onClick={() => setViewTarget(null)}>Close</Button>{canManageBookings && canCancelBooking(viewTarget, { isManager: true }) && viewTarget?.status === BOOKING_STATUS.APPROVED && <Button color="warning" variant="outlined" onClick={() => { setCancelTarget(viewTarget); setViewTarget(null); }}>Cancel Approved Booking</Button>}</DialogActions></Dialog>
+    <ConfirmDialog open={Boolean(cancelTarget)} title="Cancel Approved Booking" message={cancelTarget ? `Cancel the approved booking “${cancelTarget.title}” on ${formatDate(cancelTarget.date)} at ${cancelTarget.time}? The requester cannot edit an approved booking.` : ''} confirmText="Cancel Booking" confirmColor="warning" onClose={() => setCancelTarget(null)} onConfirm={async () => { if (cancelTarget && await cancelBooking(cancelTarget.id)) setCancelTarget(null); }} />
     <ConfirmDialog open={Boolean(approving)} title="Approve booking" message={approving ? `Approve “${approving.title}” for ${formatDate(approving.date)} at ${approving.time}?` : ''} confirmText="Approve" confirmColor="success" onClose={() => setApproving(null)} onConfirm={async () => { if (approving && await approveBooking(approving.id)) setApproving(null); }} />
   </Box>;
 }

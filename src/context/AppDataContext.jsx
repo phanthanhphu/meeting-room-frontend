@@ -1,6 +1,9 @@
+import { formatTimeRange, dateKey } from '../utils/date.js';
+import { WS_EVENT_TYPE, REALTIME_INTERVAL_MS, DEFAULT_BOOKING_CALENDAR_RANGE_DAYS } from '../constants/events.js';
+import { BOOKING_STATUS, ROOM_STATUS } from '../constants/statuses.js';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import dayjs from 'dayjs';
-import globalApi, { APP_EVENT_WS_URL } from '../routes/globalApi';
+import globalApi, { APP_EVENT_WS_URL, authStorage } from '../routes/globalApi';
 import { useAuth } from './AuthContext';
 
 const AppDataContext = createContext(null);
@@ -14,7 +17,7 @@ const mapRoom = (room) => ({
   description: room.description || '',
   facilities: room.amenities || '',
   equipmentIds: room.equipmentIds || [],
-  status: room.status === 'AVAILABLE' ? 'ACTIVE' : room.status
+  status: room.status === ROOM_STATUS.AVAILABLE ? ROOM_STATUS.ACTIVE : room.status
 });
 
 const roomPayload = (room) => ({
@@ -25,7 +28,7 @@ const roomPayload = (room) => ({
   description: room.description || '',
   amenities: room.facilities || '',
   equipmentIds: room.equipmentIds || [],
-  status: room.status === 'ACTIVE' ? 'AVAILABLE' : room.status
+  status: room.status === ROOM_STATUS.ACTIVE ? ROOM_STATUS.AVAILABLE : room.status
 });
 
 const mapUser = (user) => ({
@@ -42,8 +45,6 @@ const mapUser = (user) => ({
 });
 
 const mapBooking = (booking) => {
-  const start = dayjs(booking.startAt);
-  const end = dayjs(booking.endAt);
   return {
     id: booking.id,
     title: booking.title,
@@ -55,8 +56,8 @@ const mapBooking = (booking) => {
     roomId: booking.room?.id || '',
     room: booking.room?.name || '',
     roomCode: booking.room?.code || '',
-    date: start.format('YYYY-MM-DD'),
-    time: `${start.format('HH:mm')} - ${end.format('HH:mm')}`,
+    date: dateKey(booking.startAt),
+    time: formatTimeRange(booking.startAt, booking.endAt),
     participants: booking.attendeeCount,
     status: booking.status,
     note: booking.purpose || '',
@@ -169,7 +170,7 @@ export function AppDataProvider({ children }) {
     }
     const range = calendarRangeRef.current || {
       from: dayjs().startOf('day').format('YYYY-MM-DD'),
-      to: dayjs().add(31, 'day').format('YYYY-MM-DD')
+      to: dayjs().add(DEFAULT_BOOKING_CALENDAR_RANGE_DAYS, 'day').format('YYYY-MM-DD')
     };
     const [mine, calendar] = await Promise.all([
       globalApi.bookings.mine(), globalApi.bookings.calendar(range.from, range.to)
@@ -203,33 +204,56 @@ export function AppDataProvider({ children }) {
   useEffect(() => { refreshAll(); }, [refreshAll]);
   useEffect(() => () => { bookingRequestRef.current += 1; }, [sessionUser?.id]);
 
-  // Same event pattern as the sample project: backend broadcasts lightweight data-change events.
-  // Data itself is still fetched through secured REST endpoints. Polling remains as a fallback.
+  // WebSocket handshake uses an authenticated, one-time 30-second ticket.
+  // Fall back to polling only while offline; reconnect after temporary network errors.
   useEffect(() => {
     if (!sessionUser) return undefined;
+    let stopped = false;
+    let connecting = false;
     let socket;
-    try {
-      socket = new WebSocket(APP_EVENT_WS_URL);
-      socket.onmessage = (event) => {
-        try {
-          const payload = JSON.parse(event.data || '{}');
-          if (payload.type === 'BOOKING_CHANGED') refreshBookings().catch(() => {});
-          if (payload.type === 'ROOM_CHANGED') refreshRooms().catch(() => {});
-          if (payload.type === 'EQUIPMENT_CHANGED') { refreshEquipment().catch(() => {}); refreshRooms().catch(() => {}); }
-          if (payload.type === 'NOTIFICATION_CHANGED') refreshNotifications().catch(() => {});
-          if (payload.type === 'USER_CHANGED') {
-            refreshMe().catch(() => {});
-            if (isAdmin) refreshUsers().catch(() => {});
-          }
-        } catch { /* ignore malformed event */ }
-      };
-    } catch { /* fallback polling below */ }
-    const timer = window.setInterval(() => { refreshBookings().catch(() => {}); refreshNotifications().catch(() => {}); }, 15000);
-    const catalogTimer = window.setInterval(() => { refreshRooms().catch(() => {}); refreshEquipment().catch(() => {}); }, 60000);
+    const connect = async () => {
+      if (stopped || connecting || socket?.readyState === WebSocket.OPEN || socket?.readyState === WebSocket.CONNECTING) return;
+      connecting = true;
+      try {
+        const result = await globalApi.auth.wsTicket();
+        if (stopped || !result?.ticket) return;
+        const ws = new WebSocket(`${APP_EVENT_WS_URL}?ticket=${encodeURIComponent(result.ticket)}`);
+        socket = ws;
+        ws.onmessage = (event) => {
+          try {
+            const payload = JSON.parse(event.data || '{}');
+            if (payload.type === WS_EVENT_TYPE.BOOKING_CHANGED) refreshBookings().catch(() => {});
+            if (payload.type === WS_EVENT_TYPE.ROOM_CHANGED) refreshRooms().catch(() => {});
+            if (payload.type === WS_EVENT_TYPE.EQUIPMENT_CHANGED) { refreshEquipment().catch(() => {}); refreshRooms().catch(() => {}); }
+            if (payload.type === WS_EVENT_TYPE.NOTIFICATION_CHANGED) refreshNotifications().catch(() => {});
+            if (payload.type === WS_EVENT_TYPE.USER_CHANGED) {
+              refreshMe().catch(() => {});
+              if (isAdmin) refreshUsers().catch(() => {});
+            }
+          } catch { /* ignore malformed socket event */ }
+        };
+        ws.onerror = () => { if (ws.readyState === WebSocket.OPEN) ws.close(); };
+      } catch { /* REST failure: offline polling will retry; 401 logs out */ }
+      finally { connecting = false; }
+    };
+    connect();
+    const retry = window.setInterval(() => { if (!document.hidden) connect(); }, REALTIME_INTERVAL_MS.reconnect);
+    const bookingPoll = window.setInterval(() => {
+      if (!document.hidden && socket?.readyState !== WebSocket.OPEN) {
+        refreshBookings().catch(() => {});
+        refreshNotifications().catch(() => {});
+      }
+    }, REALTIME_INTERVAL_MS.bookingPoll);
+    const catalogPoll = window.setInterval(() => {
+      if (!document.hidden && socket?.readyState !== WebSocket.OPEN) {
+        refreshRooms().catch(() => {});
+        refreshEquipment().catch(() => {});
+      }
+    }, REALTIME_INTERVAL_MS.catalogPoll);
     return () => {
-      window.clearInterval(timer);
-      window.clearInterval(catalogTimer);
-      if (socket && socket.readyState <= 1) socket.close();
+      stopped = true;
+      window.clearInterval(retry); window.clearInterval(bookingPoll); window.clearInterval(catalogPoll);
+      if (socket && socket.readyState <= WebSocket.OPEN) socket.close();
     };
   }, [sessionUser, isAdmin, refreshBookings, refreshRooms, refreshEquipment, refreshUsers, refreshNotifications, refreshMe]);
 
@@ -251,7 +275,7 @@ export function AppDataProvider({ children }) {
     try {
       const updated = mapBooking(await globalApi.bookings.update(id, bookingPayload(form, rooms)));
       setBookings((current) => current.map((row) => row.id === id ? updated : row));
-      notify(updated.status === 'PENDING' ? 'Booking saved. Approved bookings return to Pending after changes.' : 'Booking updated successfully.');
+      notify(updated.status === BOOKING_STATUS.PENDING ? 'Booking saved. Approved bookings return to Pending after changes.' : 'Booking updated successfully.');
       return updated;
     } catch (error) { return fail(error, 'Unable to update booking.'); }
   }, [isReadOnly, rooms, notify, fail]);
@@ -261,26 +285,30 @@ export function AppDataProvider({ children }) {
     try {
       const response = canManageBookings ? await globalApi.admin.bookings.cancel(id) : await globalApi.bookings.cancel(id);
       const updated = mapBooking(response);
-      if (updated.status !== 'CANCELLED') {
+      if (updated.status !== BOOKING_STATUS.CANCELLED) {
         throw new Error('Cancel request completed but booking status was not updated to CANCELLED.');
       }
 
       // Update immediately so every component using the shared booking state sees CANCELLED.
       setBookings((current) => current.map((row) => row.id === id ? updated : row));
 
-      // Verify the exact booking from MongoDB again. This avoids a stale list/calendar state
-      // making the UI look APPROVED/PENDING after a successful cancel.
-      const persisted = mapBooking(await globalApi.bookings.get(id));
-      if (persisted.status !== 'CANCELLED') {
-        throw new Error(`Booking status is ${persisted.status} after cancel. Expected CANCELLED.`);
-      }
-      setBookings((current) => current.map((row) => row.id === id ? persisted : row));
-
-      // Synchronize My Bookings / Approvals / Dashboard in the background. Calendar will
-      // intentionally stop showing the cancelled event because it is no longer active.
+      // The PATCH succeeded; verification failure must not be reported as a failed cancel.
+      let confirmed = updated;
+      let verificationWarning = false;
+      try {
+        const persisted = mapBooking(await globalApi.bookings.get(id));
+        if (persisted.status === BOOKING_STATUS.CANCELLED) {
+          confirmed = persisted;
+          setBookings((current) => current.map((row) => row.id === id ? persisted : row));
+        } else {
+          verificationWarning = true;
+        }
+      } catch { verificationWarning = true; }
       refreshBookings().catch(() => {});
-      notify('Booking cancelled. Status updated to CANCELLED.');
-      return persisted;
+      notify(verificationWarning
+        ? 'Booking cancelled successfully. Could not verify the latest status; please refresh the page.'
+        : 'Booking cancelled. Status updated to CANCELLED.', verificationWarning ? 'warning' : 'success');
+      return confirmed;
     } catch (error) { return fail(error, 'Unable to cancel booking.'); }
   }, [isReadOnly, canManageBookings, refreshBookings, notify, fail]);
 
@@ -430,13 +458,16 @@ export function AppDataProvider({ children }) {
     if (!isAdmin) throw new Error('Admin permission is required.');
     try {
       const response = await globalApi.admin.users.resetPassword(id);
+      // Keep this browser signed in when an Admin resets their own password.
+      // Older tokens from other sessions are invalidated by the backend.
+      if (response.token && id === sessionUser?.id) authStorage.setToken(response.token);
       notify('Password reset completed. The new password is active immediately.');
       return response.temporaryPassword;
     } catch (error) {
       notify(error?.message || 'Unable to reset password.', 'error');
       throw error;
     }
-  }, [isAdmin, notify]);
+  }, [isAdmin, sessionUser?.id, notify]);
 
   const deleteUser = useCallback(async (id) => {
     if (!isAdmin) return fail(new Error('Admin permission is required.'));

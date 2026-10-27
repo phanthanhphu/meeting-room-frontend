@@ -1,3 +1,5 @@
+import { ROOM_FORM_DEFAULTS } from '../constants/rooms.js';
+import { ROOM_STATUS, EQUIPMENT_STATUS, ROOM_FILTER_STATUS_OPTIONS } from '../constants/statuses.js';
 import { useMemo, useState } from 'react';
 import {
   Box, Button, Checkbox, Chip, Dialog, DialogActions, DialogContent, DialogTitle,
@@ -27,7 +29,7 @@ const makeRoomCode = () => {
   crypto.getRandomValues(bytes);
   return `MR-${Array.from(bytes, (value) => value.toString(16).padStart(2, '0')).join('').toUpperCase()}`;
 };
-const blank = { code: '', name: '', location: '', capacity: 4, equipmentIds: [], description: '', status: 'ACTIVE' };
+const blank = ROOM_FORM_DEFAULTS;
 const border = { border: '1px solid #E5EBF3', borderRadius: 3, boxShadow: '0 8px 26px rgba(34,54,82,.035)' };
 
 export default function RoomManagementPage() {
@@ -40,7 +42,7 @@ export default function RoomManagementPage() {
   const [deviceSearch, setDeviceSearch] = useState('');
   const [saving, setSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
-  const activeEquipment = useMemo(() => equipment.filter((item) => item.status !== 'INACTIVE' && (`${item.name} ${item.code} ${item.category}`).toLowerCase().includes(deviceSearch.trim().toLowerCase())), [equipment, deviceSearch]);
+  const activeEquipment = useMemo(() => equipment.filter((item) => item.status !== EQUIPMENT_STATUS.INACTIVE && (`${item.name} ${item.code} ${item.category}`).toLowerCase().includes(deviceSearch.trim().toLowerCase())), [equipment, deviceSearch]);
   const grouped = EQUIPMENT_CATEGORIES.map((group) => ({ ...group, options: activeEquipment.filter((device) => device.category === group.value) })).filter((group) => group.options.length);
   const rows = useMemo(() => rooms.map((r) => ({ ...r, equipmentSearch: (r.equipmentIds || []).map((id) => equipment.find((device) => device.id === id)?.name || '').join(' ') })), [rooms, equipment]);
   const add = () => { setEditId(null); setForm({ ...blank, code: makeRoomCode(), equipmentIds: [] }); setDeviceSearch(''); setOpen(true); };
@@ -64,16 +66,16 @@ export default function RoomManagementPage() {
     <Grid container spacing={1.3} sx={{ mb: 1.7 }}>
       {[
         { label: 'Total rooms', count: rooms.length, icon: MeetingRoomOutlined, color: '#2563EB', bg: '#EFF6FF' },
-        { label: 'Available', count: rooms.filter((r) => r.status === 'ACTIVE').length, icon: PeopleOutlineRounded, color: '#059669', bg: '#ECFDF5' },
-        { label: 'Under maintenance', count: rooms.filter((r) => r.status === 'MAINTENANCE').length, icon: BuildCircleOutlined, color: '#D97706', bg: '#FFFBEB' },
+        { label: 'Available', count: rooms.filter((r) => r.status === ROOM_STATUS.ACTIVE).length, icon: PeopleOutlineRounded, color: '#059669', bg: '#ECFDF5' },
+        { label: 'Under maintenance', count: rooms.filter((r) => r.status === ROOM_STATUS.MAINTENANCE).length, icon: BuildCircleOutlined, color: '#D97706', bg: '#FFFBEB' },
         { label: 'Device types', count: equipment.length, icon: Inventory2Outlined, color: '#7C3AED', bg: '#F5F3FF' }
       ].map(({ label, count, icon: Icon, color, bg }) => <Grid item xs={6} md={3} key={label}><Paper sx={{ ...border, p: 1.6, height: '100%' }}><Stack direction="row" alignItems="center" gap={1.2}><Box sx={{ bgcolor: bg, borderRadius: 2, p: 1, display: 'grid', placeItems: 'center' }}><Icon sx={{ fontSize: 21, color }} /></Box><Box><Typography sx={{ fontWeight: 850, color: '#18385D', fontSize: '1.4rem' }}>{count}</Typography><Typography sx={{ fontSize: '.69rem', color: '#7A8FA8', fontWeight: 650 }}>{label}</Typography></Box></Stack></Paper></Grid>)}
     </Grid>
-    <Paper sx={{ ...border, overflow: 'hidden' }}><DataTable rows={rows} searchFields={[{ key: 'name', label: 'Room name' }, { key: 'equipmentSearch', label: 'Equipment' }]} filters={[{ key: 'status', label: 'Status', options: ['ACTIVE', 'MAINTENANCE', 'DISABLED'] }, { key: 'location', label: 'Location', options: [...new Set(rooms.map((r) => r.location).filter(Boolean))] }]} initialPageSize={10} columns={[
+    <Paper sx={{ ...border, overflow: 'hidden' }}><DataTable rows={rows} searchFields={[{ key: 'name', label: 'Room name' }, { key: 'equipmentSearch', label: 'Equipment' }]} filters={[{ key: 'status', label: 'Status', options: ROOM_FILTER_STATUS_OPTIONS }, { key: 'location', label: 'Location', options: [...new Set(rooms.map((r) => r.location).filter(Boolean))] }]} initialPageSize={10} columns={[
       { key: 'name', label: 'Room name', render: (r) => <Typography sx={{ color: '#17345A', fontWeight: 750 }}>{r.name}</Typography> },
       { key: 'location', label: 'Location' },
       { key: 'capacity', label: 'Seats', align: 'center' },
-      { key: 'equipmentSearch', label: 'Equipment', sortable: false, render: (r) => <EquipmentPills ids={r.equipmentIds} equipment={equipment} limit={2} small /> },
+      { key: 'equipmentSearch', label: 'Equipment', sortable: false, render: (r) => <EquipmentPills ids={r.equipmentIds} equipment={equipment} limit={2} small roomName={r.name} /> },
       { key: 'status', label: 'Status', render: (r) => <StatusChip value={r.status} /> },
       ...(canManageRooms ? [{ key: 'actions', label: 'Actions', align: 'right', sortable: false, render: (r) => <Stack direction="row" justifyContent="flex-end"><Tooltip title="Edit room"><IconButton size="small" aria-label={`Edit ${r.name}`} onClick={() => edit(r)}><EditOutlined sx={{ fontSize: 18 }} /></IconButton></Tooltip><Tooltip title="Delete room"><IconButton size="small" color="error" aria-label={`Delete ${r.name}`} onClick={() => setDeleteTarget(r)}><DeleteOutlineOutlined sx={{ fontSize: 18 }} /></IconButton></Tooltip></Stack> }] : [])
     ]} /></Paper>
@@ -85,7 +87,7 @@ export default function RoomManagementPage() {
         <Box sx={{ borderRadius: 2.5, border: '1px solid #E4EAF3', p: 1.7, bgcolor: '#FBFCFF' }}>
           <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ xs: 'stretch', sm: 'center' }} spacing={1}><Box><Typography sx={{ fontWeight: 800, fontSize: '.88rem', color: '#173A64' }}>Available equipment <Chip size="small" label={`${form.equipmentIds.length} selected`} sx={{ ml: .6, bgcolor: '#EAF2FF', color: '#2563EB', fontWeight: 750 }} /></Typography><Typography sx={{ fontSize: '.72rem', color: '#8494A8', mt: .25 }}>Select from the managed equipment catalog, not free-text names.</Typography></Box><TextField placeholder="Find equipment..." size="small" value={deviceSearch} onChange={(e) => setDeviceSearch(e.target.value)} sx={{ minWidth: { sm: 205 } }} InputProps={{ startAdornment: <InputAdornment position="start"><SearchRounded sx={{ color: '#96A9BD', fontSize: 18 }} /></InputAdornment> }} /></Stack>
           <Box sx={{ mt: 1.5, maxHeight: 285, overflowY: 'auto', pr: .35 }}>
-            {grouped.map((group) => <Box key={group.value} sx={{ mb: 1.5 }}><Typography sx={{ textTransform: 'uppercase', color: '#91A3B9', fontSize: '.63rem', fontWeight: 850, letterSpacing: .8, mb: .7 }}>{group.label}</Typography><Grid container spacing={.9}>{group.options.map((device) => { const selected = form.equipmentIds.includes(device.id); return <Grid item xs={12} sm={6} key={device.id}><Box onClick={() => toggleEquipment(device.id)} role="checkbox" tabIndex={0} aria-checked={selected} aria-label={`Select ${device.name}`} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleEquipment(device.id); } }} sx={{ cursor: 'pointer', display: 'flex', alignItems: 'center', p: .8, gap: 1, borderRadius: 2, border: selected ? '1px solid #6A99E7' : '1px solid #E1E8F2', bgcolor: selected ? '#EEF5FF' : '#fff', '&:hover': { borderColor: '#8FB6EE' } }}><EquipmentIcon item={device} size={21} /><Box sx={{ flex: 1, minWidth: 0 }}><Typography sx={{ fontSize: '.76rem', fontWeight: 750, color: '#2D4B70', overflowWrap: 'anywhere' }}>{device.name}</Typography>{device.status === 'MAINTENANCE' && <Typography sx={{ fontSize: '.63rem', color: '#B45309' }}>Under maintenance</Typography>}</Box><Checkbox size="small" checked={selected} tabIndex={-1} sx={{ p: .35 }} /></Box></Grid>; })}</Grid></Box>)}
+            {grouped.map((group) => <Box key={group.value} sx={{ mb: 1.5 }}><Typography sx={{ textTransform: 'uppercase', color: '#91A3B9', fontSize: '.63rem', fontWeight: 850, letterSpacing: .8, mb: .7 }}>{group.label}</Typography><Grid container spacing={.9}>{group.options.map((device) => { const selected = form.equipmentIds.includes(device.id); return <Grid item xs={12} sm={6} key={device.id}><Box onClick={() => toggleEquipment(device.id)} role="checkbox" tabIndex={0} aria-checked={selected} aria-label={`Select ${device.name}`} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleEquipment(device.id); } }} sx={{ cursor: 'pointer', display: 'flex', alignItems: 'center', p: .8, gap: 1, borderRadius: 2, border: selected ? '1px solid #6A99E7' : '1px solid #E1E8F2', bgcolor: selected ? '#EEF5FF' : '#fff', '&:hover': { borderColor: '#8FB6EE' } }}><EquipmentIcon item={device} size={21} /><Box sx={{ flex: 1, minWidth: 0 }}><Typography sx={{ fontSize: '.76rem', fontWeight: 750, color: '#2D4B70', overflowWrap: 'anywhere' }}>{device.name}</Typography>{device.status === EQUIPMENT_STATUS.MAINTENANCE && <Typography sx={{ fontSize: '.63rem', color: '#B45309' }}>Under maintenance</Typography>}</Box><Checkbox size="small" checked={selected} tabIndex={-1} sx={{ p: .35 }} /></Box></Grid>; })}</Grid></Box>)}
             {!grouped.length && <Typography sx={{ fontSize: '.77rem', color: '#8FA1B4', textAlign: 'center', py: 2 }}>{equipment.length ? 'No equipment matches your search.' : 'No equipment in the catalog yet.'}</Typography>}
           </Box>
           <Stack direction="row" gap={1} alignItems="center" sx={{ mt: 1.2, flexWrap: 'wrap' }}><Typography sx={{ fontSize: '.72rem', color: '#8294AA' }}>Missing a device?</Typography><Button size="small" onClick={() => navigate('/equipment-management')} sx={{ fontSize: '.72rem' }}>Open equipment catalog</Button></Stack>

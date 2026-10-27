@@ -1,3 +1,7 @@
+import TimeSelect from './TimeSelect.jsx';
+import { formatTime } from '../utils/date.js';
+import { BOOKING_DEFAULTS } from '../constants/booking.js';
+import { BOOKING_STATUS, BOOKING_STATUS_GROUPS, ROOM_STATUS } from '../constants/statuses.js';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import dayjs from 'dayjs';
 import globalApi from '../routes/globalApi';
@@ -14,16 +18,16 @@ const BUSINESS_END = BOOKING_LIMITS.end;
 const nextBookingSlot = () => {
   const now = dayjs();
   let date = now;
-  let start = Math.max(9 * 60, Math.ceil((now.hour() * 60 + now.minute() + 1) / 30) * 30);
-  if (now.day() === 0 || start > 17 * 60) {
+  let start = Math.max(minutesOf(BOOKING_DEFAULTS.startTime), Math.ceil((now.hour() * 60 + now.minute() + 1) / BOOKING_DEFAULTS.snapMinutes) * BOOKING_DEFAULTS.snapMinutes);
+  if (now.day() === 0 || start > minutesOf(BUSINESS_END) - BOOKING_DEFAULTS.slotMinutes) {
     date = now.add(1, 'day');
     if (date.day() === 0) date = date.add(1, 'day');
-    start = 9 * 60;
+    start = minutesOf(BOOKING_DEFAULTS.startTime);
   }
   const formatMinutes = (total) => `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
-  return { date: date.format('YYYY-MM-DD'), startTime: formatMinutes(start), endTime: formatMinutes(start + 60) };
+  return { date: date.format('YYYY-MM-DD'), startTime: formatMinutes(start), endTime: formatMinutes(start + BOOKING_DEFAULTS.slotMinutes) };
 };
-const defaultForm = () => ({ title: '', roomId: '', ...nextBookingSlot(), participants: 1, note: '' });
+const defaultForm = () => ({ title: '', roomId: '', ...nextBookingSlot(), participants: BOOKING_DEFAULTS.participants, note: '' });
 
 export default function BookingDialog({
   open,
@@ -43,7 +47,7 @@ export default function BookingDialog({
   const originalFormRef = useRef(null);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
   const [saving, setSaving] = useState(false);
-  const activeRooms = useMemo(() => rooms.filter((room) => room.status === 'ACTIVE'), [rooms]);
+  const activeRooms = useMemo(() => rooms.filter((room) => room.status === ROOM_STATUS.ACTIVE), [rooms]);
   const activeRoomKeys = activeRooms.map((room) => room.id).join('|');
   const selectedRoom = activeRooms.find((room) => room.id === form.roomId);
   const bookedByName = booking?.user || sessionUser?.fullName || sessionUser?.name || '';
@@ -54,7 +58,7 @@ export default function BookingDialog({
     if (!open) return;
     setSaving(false);
     setConfirmDiscard(false);
-    const [bookingStart = '09:00', bookingEnd = '10:00'] = String(booking?.time || '').split(' - ');
+    const [bookingStart = BOOKING_DEFAULTS.startTime, bookingEnd = BOOKING_DEFAULTS.endTime] = String(booking?.time || '').split(' - ');
     const startingForm = booking ? {
       title: booking.title || '', roomId: activeRooms.find((room) => room.id === booking.roomId || room.name === booking.room)?.id || '', date: booking.date || '', startTime: bookingStart, endTime: bookingEnd,
       participants: booking.participants || 1, note: booking.note || ''
@@ -62,8 +66,8 @@ export default function BookingDialog({
       ...defaultForm(),
       roomId: activeRooms.find((room) => room.id === defaultRoom || room.name === defaultRoom)?.id || activeRooms[0]?.id || '',
       date: defaultDate || nextBookingSlot().date,
-      startTime: defaultStartTime || (!defaultDate ? nextBookingSlot().startTime : '09:00'),
-      endTime: defaultEndTime || (!defaultDate ? nextBookingSlot().endTime : '10:00')
+      startTime: defaultStartTime || (!defaultDate ? nextBookingSlot().startTime : BOOKING_DEFAULTS.startTime),
+      endTime: defaultEndTime || (!defaultDate ? nextBookingSlot().endTime : BOOKING_DEFAULTS.endTime)
     };
     originalFormRef.current = JSON.stringify(startingForm);
     setForm(startingForm);
@@ -100,20 +104,20 @@ export default function BookingDialog({
   const durationValid = timeValid && durationMinutes >= BOOKING_LIMITS.minMinutes && durationMinutes <= BOOKING_LIMITS.maxMinutes;
   const futureValid = Boolean(form.date && form.startTime) && dayjs(`${form.date}T${form.startTime}`).isAfter(dayjs());
   const busyBookings = availability.date === form.date ? availability.rows.filter((row) =>
-    row.status === 'APPROVED' && row.room?.id === form.roomId && row.id !== booking?.id
+    row.status === BOOKING_STATUS.APPROVED && row.room?.id === form.roomId && row.id !== booking?.id
   ) : [];
   const roomConflict = timeValid && busyBookings.some((row) => overlaps(
     minutesOf(form.startTime), minutesOf(form.endTime),
-    minutesOf(dayjs(row.startAt).format('HH:mm')), minutesOf(dayjs(row.endAt).format('HH:mm'))
+    minutesOf(formatTime(row.startAt)), minutesOf(formatTime(row.endAt))
   ));
   const myConflict = Boolean(sessionUser) && timeValid && bookings.some((row) =>
     row.id !== booking?.id && row.userId === sessionUser.id && row.date === form.date &&
-    ['PENDING', 'APPROVED'].includes(row.status) && overlaps(
+    BOOKING_STATUS_GROUPS.BLOCKING_USER.includes(row.status) && overlaps(
       minutesOf(form.startTime), minutesOf(form.endTime),
       minutesOf(String(row.time).split(' - ')[0]), minutesOf(String(row.time).split(' - ')[1])
     )
   );
-  const valid = form.title.trim() && selectedRoom && dateValid && futureValid && timeValid && durationValid &&
+  const valid = (!booking || booking.status === BOOKING_STATUS.PENDING) && form.title.trim() && selectedRoom && dateValid && futureValid && timeValid && durationValid &&
     businessHoursValid && !sundaySelected && people > 0 && capacityValid && !roomConflict && !myConflict &&
     !(availability.date === form.date && availability.loading);
   const submit = async () => {
@@ -125,11 +129,10 @@ export default function BookingDialog({
   return <><Dialog open={open} onClose={requestClose} fullWidth maxWidth="sm" PaperProps={{ sx: { borderRadius: 3, overflow: 'hidden' } }}>
     <Box sx={{ backgroundImage: `linear-gradient(90deg,rgba(255,255,255,.94),rgba(255,255,255,.72)),url(${bookingBackground})`, backgroundSize: 'cover', backgroundPosition: 'center', borderBottom: '1px solid #E3EAF1' }}>
       <DialogTitle sx={{ pb: .4, fontSize: '1.1rem', fontWeight: 850, color: '#173B63' }}>{booking ? 'Edit Meeting Booking' : 'New Meeting Room Booking'}</DialogTitle>
-      <Typography sx={{ px: 3, pb: 1.4, fontSize: '.68rem', color: '#61758B' }}>{booking ? 'Approved booking changes will require approval again.' : 'Create a request and send it to Admin for approval.'}</Typography>
+      <Typography sx={{ px: 3, pb: 1.4, fontSize: '.68rem', color: '#61758B' }}>{booking ? 'Only pending booking requests can be edited.' : 'Create a request and send it to Admin for approval.'}</Typography>
     </Box>
     <DialogContent dividers>
       <Stack spacing={1.5} sx={{ pt: .4 }}>
-        {booking?.status === 'APPROVED' && <Alert severity="warning" sx={{ py: .2, fontSize: '.72rem' }}>Editing an approved booking changes it back to PENDING.</Alert>}
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.1}>
           <TextField label="Booked by" size="small" fullWidth value={bookedByName} InputProps={{ readOnly: true }} />
           <TextField label="Domain / account" size="small" fullWidth value={bookedByAccount || bookedByEmail} InputProps={{ readOnly: true }} />
@@ -143,8 +146,8 @@ export default function BookingDialog({
         </Box>
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.1}>
           <TextField label="Date" type="date" size="small" fullWidth value={form.date} onChange={change('date')} InputLabelProps={{ shrink: true }} inputProps={{ min: minDate, max: maxDate }} error={!dateValid || sundaySelected} helperText={sundaySelected ? 'Sunday is not available for booking.' : !dateValid ? 'Choose a date within the next 90 days.' : ''} />
-          <TextField label="Start time" type="time" size="small" fullWidth value={form.startTime} onChange={change('startTime')} InputLabelProps={{ shrink: true }} inputProps={{ min: BUSINESS_START, max: '17:45', step: 900 }} />
-          <TextField label="End time" type="time" size="small" fullWidth value={form.endTime} onChange={change('endTime')} InputLabelProps={{ shrink: true }} inputProps={{ min: '07:15', max: BUSINESS_END, step: 900 }} />
+          <TimeSelect label="Start time" size="small" fullWidth value={form.startTime} onChange={change('startTime')} min={BUSINESS_START} max={BOOKING_DEFAULTS.latestStartTime} />
+          <TimeSelect label="End time" size="small" fullWidth value={form.endTime} onChange={change('endTime')} min={BOOKING_DEFAULTS.earliestEndTime} max={BUSINESS_END} />
         </Stack>
         <TextField label="Participants" type="number" size="small" fullWidth value={form.participants} onChange={change('participants')} error={!capacityValid} helperText={!capacityValid ? `Room capacity is ${selectedRoom?.capacity || 0} people.` : selectedRoom ? `Capacity: ${selectedRoom.capacity} people` : ''} inputProps={{ min: 1, max: selectedRoom?.capacity }} />
         {!timeValid && form.startTime && form.endTime && <Typography sx={{ fontSize: '.68rem', color: '#D32F2F' }}>End time must be later than start time.</Typography>}
@@ -155,7 +158,7 @@ export default function BookingDialog({
         {roomConflict && <Alert severity="error" sx={{ py: .2 }}>This room has an approved meeting in the selected time slot. Choose another time or room.</Alert>}
         {availability.loading && availability.date === form.date && <Typography variant="caption" color="text.secondary">Checking room availability...</Typography>}
         {availability.error && availability.date === form.date && <Alert severity="warning" sx={{ py: .2 }}>Live availability could not be checked. The server will check when you submit.</Alert>}
-        {busyBookings.length > 0 && !availability.loading && <Box sx={{ p: 1, bgcolor: '#F7F9FC', borderRadius: 1.5 }}><Typography sx={{ fontSize: '.73rem', fontWeight: 750, color: '#345A81' }}>Approved bookings in this room:</Typography>{busyBookings.map((row) => <Typography key={row.id} sx={{ fontSize: '.7rem', color: '#607890' }}>{dayjs(row.startAt).format('HH:mm')}–{dayjs(row.endAt).format('HH:mm')} · {row.title}</Typography>)}</Box>}
+        {busyBookings.length > 0 && !availability.loading && <Box sx={{ p: 1, bgcolor: '#F7F9FC', borderRadius: 1.5 }}><Typography sx={{ fontSize: '.73rem', fontWeight: 750, color: '#345A81' }}>Approved bookings in this room:</Typography>{busyBookings.map((row) => <Typography key={row.id} sx={{ fontSize: '.7rem', color: '#607890' }}>{formatTime(row.startAt)}–{formatTime(row.endAt)} · {row.title}</Typography>)}</Box>}
         <Typography sx={{ fontSize: '.72rem', color: '#71849A' }}>Booking hours: Monday–Saturday, 07:00–18:00. Maximum 90 days ahead; 15–240 minutes per meeting.</Typography>
         <TextField label="Purpose / Note" size="small" multiline minRows={3} fullWidth value={form.note} onChange={change('note')} />
       </Stack>

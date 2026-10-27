@@ -1,3 +1,4 @@
+import { BOOKING_STATUS, BOOKING_STATUS_GROUPS } from '../constants/statuses.js';
 import { useMemo, useState } from 'react';
 import { downloadBookingReportXlsx } from '../utils/exportBookingReportXlsx';
 import dayjs from 'dayjs';
@@ -86,7 +87,7 @@ export default function ReportsPage() {
   return <Box sx={{ p: .55 }}>
     <PageHeader
       title="Booking Reports"
-      subtitle="Filter bookings and export a formatted Excel workbook with overview and detailed records"
+      subtitle="Filter bookings and export Excel with an overview, booking details, user totals, and a booking timeline"
       actions={<Stack direction="row" spacing={.65}>
         <Button size="small" variant="contained" startIcon={<DownloadOutlined />} onClick={exportExcel} disabled={!filtered.length || exporting || loading}>{exporting ? 'Preparing Excel...' : 'Export Excel'}</Button>
       </Stack>}
@@ -115,9 +116,9 @@ export default function ReportsPage() {
 
     <Grid container spacing={1.05} sx={{ mb: 1.05 }}>
       <Grid item xs={12} sm={6} lg={3}><Kpi label="Total records" value={filtered.length} icon={AssessmentOutlined} tone="#4680FF" /></Grid>
-      <Grid item xs={12} sm={6} lg={3}><Kpi label="Approved / completed" value={filtered.filter((row) => ['APPROVED', 'COMPLETED'].includes(row.status)).length} icon={CheckCircleOutline} tone="#2CA87F" /></Grid>
-      <Grid item xs={12} sm={6} lg={3}><Kpi label="Pending" value={filtered.filter((row) => row.status === 'PENDING').length} icon={PendingActionsOutlined} tone="#E58A00" /></Grid>
-      <Grid item xs={12} sm={6} lg={3}><Kpi label="Rejected / Cancelled" value={filtered.filter((row) => ['REJECTED', 'CANCELLED'].includes(row.status)).length} icon={HighlightOffOutlined} tone="#DC2626" /></Grid>
+      <Grid item xs={12} sm={6} lg={3}><Kpi label="Approved / completed" value={filtered.filter((row) => BOOKING_STATUS_GROUPS.REPORT_ACTIVE.includes(row.status)).length} icon={CheckCircleOutline} tone="#2CA87F" /></Grid>
+      <Grid item xs={12} sm={6} lg={3}><Kpi label="Pending" value={filtered.filter((row) => row.status === BOOKING_STATUS.PENDING).length} icon={PendingActionsOutlined} tone="#E58A00" /></Grid>
+      <Grid item xs={12} sm={6} lg={3}><Kpi label="Rejected / Cancelled" value={filtered.filter((row) => BOOKING_STATUS_GROUPS.REPORT_CLOSED.includes(row.status)).length} icon={HighlightOffOutlined} tone="#DC2626" /></Grid>
     </Grid>
 
     <MainCard content={false}>

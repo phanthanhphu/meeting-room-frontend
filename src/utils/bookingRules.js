@@ -1,15 +1,27 @@
+import { BOOKING_STATUS, BOOKING_STATUS_GROUPS } from '../constants/statuses.js';
+import { dateKey, formatTime } from './date.js';
 // Frontend mirrors the booking rules in backend BookingRulesProperties.
 // Backend validation remains authoritative, especially for concurrent requests.
-export const BOOKING_LIMITS = Object.freeze({ start: '07:00', end: '18:00', minMinutes: 15, maxMinutes: 240, advanceDays: 90 });
+export { BOOKING_LIMITS } from '../constants/booking.js';
 export const minutesOf = (time) => {
   const [hours, minutes] = String(time || '00:00').split(':').map(Number);
   return hours * 60 + minutes;
 };
 export const overlaps = (aStart, aEnd, bStart, bEnd) => aStart < bEnd && bStart < aEnd;
-export const canChangeBooking = (booking, now = new Date()) => {
-  if (!booking || !['PENDING', 'APPROVED'].includes(booking.status)) return false;
+export const isFutureBooking = (booking, now = new Date()) => {
+  if (!booking) return false;
   const start = String(booking.time || '').split(' - ')[0];
-  return Boolean(booking.date && start) && new Date(`${booking.date}T${start}:00`).getTime() > now.getTime();
+  // Compare in the configured meeting-room time zone, not the workstation zone.
+  const currentIso = now.toISOString();
+  return Boolean(booking.date && start) && `${booking.date}T${start}` > `${dateKey(currentIso)}T${formatTime(currentIso)}`;
+};
+export const canChangeBooking = (booking, now = new Date()) =>
+  Boolean(booking && BOOKING_STATUS_GROUPS.EDITABLE.includes(booking.status) && isFutureBooking(booking, now));
+
+export const canCancelBooking = (booking, { isManager = false, isOwner = false } = {}, now = new Date()) => {
+  if (!booking || !isFutureBooking(booking, now)) return false;
+  if (booking.status === BOOKING_STATUS.APPROVED) return isManager;
+  return booking.status === BOOKING_STATUS.PENDING && (isManager || isOwner);
 };
 export function calculateDayLayout(bookings) {
   // Interval partitioning: overlapping meetings are adjacent instead of stacked.

@@ -1,3 +1,5 @@
+import { USER_ROLES } from './userConfig.js';
+import { PASSWORD_RESET_TEXT } from '../../constants/users.js';
 import { useMemo, useState } from 'react';
 import { Box, Button, Chip, IconButton, Stack, Tab, Tabs, Tooltip } from '@mui/material';
 import PersonAddAltOutlined from '@mui/icons-material/PersonAddAltOutlined';
@@ -54,7 +56,7 @@ export default function UserManagementPage() {
       key: 'actions', label: 'Actions', align: 'right', sortable: false,
       render: (r) => <Stack direction="row" justifyContent="flex-end">
         <Tooltip title="Edit"><IconButton size="small" onClick={() => setEditTarget(r)}><EditOutlined sx={{ fontSize: 17 }} /></IconButton></Tooltip>
-        {sourceTab === 'SYSTEM' && <Tooltip title="Reset System Password"><IconButton size="small" onClick={() => setResetTarget(r)}><LockResetOutlined sx={{ fontSize: 18 }} /></IconButton></Tooltip>}
+        {sourceTab === 'SYSTEM' && <Tooltip title={PASSWORD_RESET_TEXT.action}><IconButton size="small" onClick={() => setResetTarget(r)}><LockResetOutlined sx={{ fontSize: 18 }} /></IconButton></Tooltip>}
         <Tooltip title={isSelf(r) ? 'Cannot disable your own account' : (r.active ? 'Disable' : 'Enable')}><span><IconButton disabled={isSelf(r)} size="small" color={r.active ? 'warning' : 'success'} onClick={async () => { await toggleUser(r.id); }}>{r.active ? <ToggleOnOutlined sx={{ fontSize: 19 }} /> : <ToggleOffOutlined sx={{ fontSize: 19 }} />}</IconButton></span></Tooltip>
         <Tooltip title={isSelf(r) ? 'Cannot delete your own account' : 'Delete'}><span><IconButton disabled={isSelf(r)} size="small" color="error" onClick={() => setDeleteTarget(r)}><DeleteOutlineOutlined sx={{ fontSize: 17 }} /></IconButton></span></Tooltip>
       </Stack>
@@ -85,7 +87,7 @@ export default function UserManagementPage() {
           { key: 'email', label: 'Email' }
         ]}
         filters={[
-          { key: 'role', label: 'Role', options: ['USER', 'VIEWER', 'ROOM_MANAGER', 'ADMIN'] },
+          { key: 'role', label: 'Role', options: USER_ROLES },
           { key: 'department', label: 'Department', options: [...new Set(visibleUsers.map((r) => r.department).filter(Boolean))] }
         ]}
         columns={columns}
@@ -94,7 +96,7 @@ export default function UserManagementPage() {
 
     <AddUserDialog open={addOpen} onClose={() => setAddOpen(false)} onSave={addUser} />
     <EditUserDialog open={Boolean(editTarget)} user={editTarget} onClose={() => setEditTarget(null)} onSave={updateUser} />
-    <ResetPasswordDialog open={Boolean(resetTarget)} user={resetTarget} onClose={() => setResetTarget(null)} onReset={resetUserPassword} />
+    <ResetPasswordDialog open={Boolean(resetTarget)} user={resetTarget} isSelf={resetTarget?.id === sessionUser?.id} onClose={() => setResetTarget(null)} onReset={resetUserPassword} />
     <ConfirmDialog open={Boolean(deleteTarget)} title="Delete User" message={deleteTarget ? `Delete ${deleteTarget.name}?` : ''} confirmText="Delete" onClose={() => setDeleteTarget(null)} onConfirm={async () => { if (await deleteUser(deleteTarget.id)) setDeleteTarget(null); }} />
   </Box>;
 }

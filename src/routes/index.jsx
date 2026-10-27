@@ -6,6 +6,6 @@ export default function AppRoutes() {
   return <Routes>
     <Route path="/login" element={<LoginPage />} />
     {MainRoutes()}
-    <Route path="*" element={<Navigate to="/dashboard" replace />} />
+    <Route path="*" element={<Navigate to="/" replace />} />
   </Routes>;
 }

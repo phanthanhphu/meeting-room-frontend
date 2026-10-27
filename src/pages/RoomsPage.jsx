@@ -1,3 +1,9 @@
+import { BOOKING_DEFAULTS } from '../constants/booking.js';
+import TimeSelect from '../components/TimeSelect.jsx';
+import { formatDate, formatTime } from '../utils/date.js';
+import { BOOKING_STATUS, ROOM_STATUS } from '../constants/statuses.js';
+import { ROOM_FILTER_DEFAULTS, ROOM_SLOT_DEFAULTS, ALL_FILTER_VALUE } from '../constants/rooms.js';
+import { TABLE_PAGE_SIZES } from '../constants/ui.js';
 import { useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
@@ -27,22 +33,22 @@ export default function RoomsPage() {
   const [defaultRoom, setDefaultRoom] = useState('');
   const [bookingDefaults, setBookingDefaults] = useState(null);
   const [availableDate, setAvailableDate] = useState('');
-  const [startTime, setStartTime] = useState('09:00');
-  const [endTime, setEndTime] = useState('10:00');
+  const [startTime, setStartTime] = useState(ROOM_SLOT_DEFAULTS.startTime);
+  const [endTime, setEndTime] = useState(ROOM_SLOT_DEFAULTS.endTime);
   const [appliedSlot, setAppliedSlot] = useState(null);
   const [slotLoading, setSlotLoading] = useState(false);
   const searchVersion = useRef(0);
   const [slotError, setSlotError] = useState('');
   const [query, setQuery] = useState('');
-  const [location, setLocation] = useState('ALL');
-  const [status, setStatus] = useState('ACTIVE');
-  const [deviceId, setDeviceId] = useState('ALL');
+  const [location, setLocation] = useState(ALL_FILTER_VALUE);
+  const [status, setStatus] = useState(ROOM_STATUS.ACTIVE);
+  const [deviceId, setDeviceId] = useState(ALL_FILTER_VALUE);
   const [minCapacity, setMinCapacity] = useState('');
-  const defaults = { query: '', location: 'ALL', status: 'ACTIVE', deviceId: 'ALL', minCapacity: '' };
+  const defaults = ROOM_FILTER_DEFAULTS;
   const [applied, setApplied] = useState(defaults);
   const visible = useMemo(() => rooms.filter((room) => {
     const search = `${room.code} ${room.name} ${room.location} ${(room.equipmentIds || []).map((id) => equipment.find((x) => x.id === id)?.name || '').join(' ')}`.toLowerCase();
-    const unavailable = appliedSlot && appliedSlot.rows.some((item) => item.status === 'APPROVED' && item.room?.id === room.id && overlaps(minutesOf(appliedSlot.start), minutesOf(appliedSlot.end), minutesOf(dayjs(item.startAt).format('HH:mm')), minutesOf(dayjs(item.endAt).format('HH:mm'))));
+    const unavailable = appliedSlot && appliedSlot.rows.some((item) => item.status === BOOKING_STATUS.APPROVED && item.room?.id === room.id && overlaps(minutesOf(appliedSlot.start), minutesOf(appliedSlot.end), minutesOf(formatTime(item.startAt)), minutesOf(formatTime(item.endAt))));
     return !unavailable && search.includes(applied.query.trim().toLowerCase()) && (applied.location === 'ALL' || room.location === applied.location) && (applied.status === 'ALL' || room.status === applied.status) && (applied.deviceId === 'ALL' || (room.equipmentIds || []).includes(applied.deviceId)) && (!applied.minCapacity || room.capacity >= Number(applied.minCapacity));
   }), [rooms, equipment, applied, appliedSlot]);
   const tableRows = useMemo(() => visible.map((room) => ({ ...room, equipmentCount: (room.equipmentIds || []).length })), [visible]);
@@ -51,7 +57,7 @@ export default function RoomsPage() {
     const requestId = ++searchVersion.current;
     if (availableDate) {
       const duration = minutesOf(endTime) - minutesOf(startTime);
-      if (availableDate < dayjs().format('YYYY-MM-DD') || availableDate > dayjs().add(90, 'day').format('YYYY-MM-DD') || dayjs(availableDate).day() === 0) {
+      if (availableDate < dayjs().format('YYYY-MM-DD') || availableDate > dayjs().add(BOOKING_LIMITS.advanceDays, 'day').format('YYYY-MM-DD') || dayjs(availableDate).day() === 0) {
         setSlotError('Choose a Monday–Saturday date within the next 90 days.'); return;
       }
       if (duration < BOOKING_LIMITS.minMinutes || duration > BOOKING_LIMITS.maxMinutes || startTime < BOOKING_LIMITS.start || endTime > BOOKING_LIMITS.end) {
@@ -67,7 +73,7 @@ export default function RoomsPage() {
     } else { setAppliedSlot(null); setSlotError(''); }
     setApplied({ query, location, status, deviceId, minCapacity });
   };
-  const reset = () => { ++searchVersion.current; setSlotLoading(false); setAvailableDate(''); setStartTime('09:00'); setEndTime('10:00'); setAppliedSlot(null); setSlotError(''); setQuery(''); setLocation('ALL'); setStatus('ACTIVE'); setDeviceId('ALL'); setMinCapacity(''); setApplied({ query: '', location: 'ALL', status: 'ACTIVE', deviceId: 'ALL', minCapacity: '' }); };
+  const reset = () => { ++searchVersion.current; setSlotLoading(false); setAvailableDate(''); setStartTime(ROOM_SLOT_DEFAULTS.startTime); setEndTime(ROOM_SLOT_DEFAULTS.endTime); setAppliedSlot(null); setSlotError(''); setQuery(''); setLocation(ALL_FILTER_VALUE); setStatus(ROOM_STATUS.ACTIVE); setDeviceId(ALL_FILTER_VALUE); setMinCapacity(''); setApplied({ ...ROOM_FILTER_DEFAULTS }); };
   const startBooking = (roomId = '') => { setDefaultRoom(roomId); setBookingDefaults(appliedSlot); setOpen(true); };
   const saveBooking = async (form) => {
     const created = await addBooking(form);
@@ -85,8 +91,8 @@ export default function RoomsPage() {
       subtitle="Browse rooms, compare seating and installed equipment, then reserve a suitable space."
       actions={canCreateBooking && <Button variant="contained" onClick={() => startBooking()} startIcon={<AddRounded />}>New booking</Button>} />
     <Stack direction="row" flexWrap="wrap" useFlexGap gap={1} sx={{ mb: 1.6 }}>
-      <Chip icon={<MeetingRoomOutlined />} label={`${rooms.filter((r) => r.status === 'ACTIVE').length} active rooms`} size="small" variant="outlined" />
-      <Chip icon={<GroupsOutlined />} label={`${rooms.reduce((a, r) => a + (r.status === 'ACTIVE' ? Number(r.capacity) : 0), 0)} seats`} size="small" variant="outlined" />
+      <Chip icon={<MeetingRoomOutlined />} label={`${rooms.filter((r) => r.status === ROOM_STATUS.ACTIVE).length} active rooms`} size="small" variant="outlined" />
+      <Chip icon={<GroupsOutlined />} label={`${rooms.reduce((a, r) => a + (r.status === ROOM_STATUS.ACTIVE ? Number(r.capacity) : 0), 0)} seats`} size="small" variant="outlined" />
     </Stack>
     <Paper sx={{ ...card, mb: 2, p: { xs: 1.45, md: 1.9 } }}>
       <FilterToolbar
@@ -96,13 +102,13 @@ export default function RoomsPage() {
         <TextField select label="Floor / location" size="small" value={location} onChange={(e) => setLocation(e.target.value)}><MenuItem value="ALL">All locations</MenuItem>{allLocations.map((v) => <MenuItem key={v} value={v}>{v}</MenuItem>)}</TextField>
         <TextField select label="Equipment" size="small" value={deviceId} onChange={(e) => setDeviceId(e.target.value)}><MenuItem value="ALL">Any equipment</MenuItem>{equipment.filter((x) => x.status !== 'INACTIVE').map((v) => <MenuItem value={v.id} key={v.id}>{v.name}</MenuItem>)}</TextField>
         <TextField select label="Status" size="small" value={status} onChange={(e) => setStatus(e.target.value)}><MenuItem value="ALL">All statuses</MenuItem><MenuItem value="ACTIVE">Active / bookable</MenuItem><MenuItem value="MAINTENANCE">Maintenance</MenuItem><MenuItem value="DISABLED">Disabled</MenuItem></TextField>
-        <TextField label="Free on date (optional)" type="date" size="small" value={availableDate} onChange={(e) => setAvailableDate(e.target.value)} InputLabelProps={{ shrink: true }} inputProps={{ min: dayjs().format('YYYY-MM-DD'), max: dayjs().add(90, 'day').format('YYYY-MM-DD') }} />
-        {availableDate && <><TextField label="From" type="time" size="small" value={startTime} onChange={(e) => setStartTime(e.target.value)} InputLabelProps={{ shrink: true }} inputProps={{ min: '07:00', max: '17:45', step: 900 }} /><TextField label="To" type="time" size="small" value={endTime} onChange={(e) => setEndTime(e.target.value)} InputLabelProps={{ shrink: true }} inputProps={{ min: '07:15', max: '18:00', step: 900 }} /></>}
+        <TextField label="Free on date (optional)" type="date" size="small" value={availableDate} onChange={(e) => setAvailableDate(e.target.value)} InputLabelProps={{ shrink: true }} inputProps={{ min: dayjs().format('YYYY-MM-DD'), max: dayjs().add(BOOKING_LIMITS.advanceDays, 'day').format('YYYY-MM-DD') }} />
+        {availableDate && <><TimeSelect label="From" size="small" value={startTime} onChange={(e) => setStartTime(e.target.value)} max={BOOKING_DEFAULTS.latestStartTime} /><TimeSelect label="To" size="small" value={endTime} onChange={(e) => setEndTime(e.target.value)} min={BOOKING_DEFAULTS.earliestEndTime} /></>}
         <TextField label="Min. seats" size="small" type="number" value={minCapacity} onChange={(e) => setMinCapacity(e.target.value)} inputProps={{ min: 1, step: 1 }} sx={{ maxWidth: { md: 135 } }} />
       </FilterToolbar>
     </Paper>
     {slotError && <Alert severity="error" sx={{ mb: 1.5 }}>{slotError}</Alert>}
-    {appliedSlot && <Alert severity="info" sx={{ mb: 1.5 }}>Only rooms without approved meetings on {appliedSlot.date}, {appliedSlot.start}–{appliedSlot.end} are shown. Pending requests may still be awaiting approval.</Alert>}
+    {appliedSlot && <Alert severity="info" sx={{ mb: 1.5 }}>Only rooms without approved meetings on {formatDate(appliedSlot.date)}, {appliedSlot.start}–{appliedSlot.end} are shown. Pending requests may still be awaiting approval.</Alert>}
     <Paper sx={{ ...card, overflow: 'hidden' }}>
       <Box sx={{ px: 2, py: 1.4, borderBottom: '1px solid #E7ECF4' }}>
         <Typography sx={{ fontSize: '.9rem', fontWeight: 850, color: '#17345A' }}>Meeting room list</Typography>
@@ -115,7 +121,7 @@ export default function RoomsPage() {
         searchable={false}
         getKey={(room) => room.id}
         initialPageSize={10}
-        pageSizeOptions={[10, 20, 50, 100]}
+        pageSizeOptions={TABLE_PAGE_SIZES}
         columns={[
           {
             key: 'name', label: 'Room name',
@@ -131,17 +137,17 @@ export default function RoomsPage() {
           {
             key: 'equipmentCount', label: 'Equipment', sortable: true,
             render: (room) => <Box sx={{ minWidth: 170, maxWidth: 310 }}>
-              <EquipmentPills ids={room.equipmentIds || []} equipment={equipment} limit={3} small />
+              <EquipmentPills ids={room.equipmentIds || []} equipment={equipment} limit={3} small roomName={room.name} />
             </Box>
           },
           {
             key: 'status', label: appliedSlot ? 'Room / time status' : 'Room status',
             render: (room) => <Chip size="small" variant="outlined"
-              label={room.status === 'ACTIVE' ? (appliedSlot ? 'Free for selected time' : 'Active') : room.status === 'MAINTENANCE' ? 'Maintenance' : 'Disabled'}
+              label={room.status === ROOM_STATUS.ACTIVE ? (appliedSlot ? 'Free for selected time' : 'Active') : room.status === ROOM_STATUS.MAINTENANCE ? 'Maintenance' : 'Disabled'}
               sx={{ height: 26, fontSize: '.69rem', fontWeight: 750,
-                bgcolor: room.status === 'ACTIVE' ? '#EAF8F1' : '#FFFAEC',
-                borderColor: room.status === 'ACTIVE' ? '#BCEAD5' : '#F3DBAB',
-                color: room.status === 'ACTIVE' ? '#047857' : '#99631C' }} />
+                bgcolor: room.status === ROOM_STATUS.ACTIVE ? '#EAF8F1' : '#FFFAEC',
+                borderColor: room.status === ROOM_STATUS.ACTIVE ? '#BCEAD5' : '#F3DBAB',
+                color: room.status === ROOM_STATUS.ACTIVE ? '#047857' : '#99631C' }} />
           },
           {
             key: 'description', label: 'Description', sortable: false,
@@ -152,7 +158,7 @@ export default function RoomsPage() {
           {
             key: 'actions', label: 'Action', align: 'center', sortable: false,
             render: (room) => canCreateBooking
-              ? <Button size="small" variant="contained" disabled={room.status !== 'ACTIVE'} onClick={() => startBooking(room.id)} sx={{ minWidth: 108, textTransform: 'none', fontWeight: 750 }}>Book room</Button>
+              ? <Button size="small" variant="contained" disabled={room.status !== ROOM_STATUS.ACTIVE} onClick={() => startBooking(room.id)} sx={{ minWidth: 108, textTransform: 'none', fontWeight: 750 }}>Book room</Button>
               : <Typography sx={{ color: '#8294A8', fontSize: '.72rem' }}>{isReadOnly ? 'View only' : 'Unavailable'}</Typography>
           }
         ]}

@@ -1,6 +1,6 @@
+import { formatDateTime } from '../utils/date.js';
 import { useEffect, useState } from 'react';
 import { Alert, Box, CircularProgress, Stack, Typography } from '@mui/material';
-import dayjs from 'dayjs';
 import globalApi from '../routes/globalApi';
 
 export default function BookingHistory({ bookingId }) {
@@ -22,7 +22,7 @@ export default function BookingHistory({ bookingId }) {
     <Stack spacing={1}>
       {state.rows.map((item) => <Box key={item.id} sx={{ pl: 1.25, borderLeft: '3px solid #9DBDEF' }}>
         <Typography sx={{ fontSize: '.73rem', fontWeight: 750, color: '#29496D' }}>{String(item.action || '').replaceAll('_', ' ')} · {item.actor?.fullName || 'System'}</Typography>
-        <Typography sx={{ fontSize: '.68rem', color: '#7287A0' }}>{item.createdAt ? dayjs(item.createdAt).format('DD/MM/YYYY HH:mm') : ''}</Typography>
+        <Typography sx={{ fontSize: '.68rem', color: '#7287A0' }}>{item.createdAt ? formatDateTime(item.createdAt) : ''}</Typography>
         {item.note && <Typography sx={{ fontSize: '.7rem', color: '#5D7188', whiteSpace: 'pre-wrap' }}>{item.note}</Typography>}
       </Box>)}
     </Stack>

@@ -1,3 +1,6 @@
+import { HOUR_HEIGHT, START_HOUR, END_HOUR, BOTTOM_GUTTER, TIMELINE_HEIGHT, HOURS, CALENDAR_DAYS, SNAP_MINUTES } from '../constants/calendar.js';
+import { CALENDAR_STATUS_COLORS as statusStyle, BOOKING_STATUS, BOOKING_STATUS_GROUPS } from '../constants/statuses.js';
+import { BOOKING_DEFAULTS } from '../constants/booking.js';
 import { useEffect, useMemo, useState } from 'react';
 import dayjs from 'dayjs';
 import { useLocation } from 'react-router-dom';
@@ -23,26 +26,8 @@ import StatusChip from '../components/StatusChip';
 import { useAppData } from '../context/AppDataContext';
 import { useAuth } from '../context/AuthContext';
 import { formatDate } from '../utils/date';
-import { canChangeBooking, calculateDayLayout } from '../utils/bookingRules';
+import { canChangeBooking, canCancelBooking, calculateDayLayout, minutesOf } from '../utils/bookingRules';
 import BookingHistory from '../components/BookingHistory';
-
-const HOUR_HEIGHT = 52;
-const START_HOUR = 7;
-const END_HOUR = 18;
-const HOURS = Array.from({ length: END_HOUR - START_HOUR + 1 }, (_, index) => START_HOUR + index);
-
-const statusStyle = {
-  APPROVED: { bg: '#E9F8F2', border: '#2CA87F', text: '#176B50' },
-  PENDING: { bg: '#FFF5E6', border: '#E58A00', text: '#8A5700' },
-  REJECTED: { bg: '#FFEDEF', border: '#DC2626', text: '#9F1D28' },
-  COMPLETED: { bg: '#ECF3FF', border: '#2563EB', text: '#214F97' },
-  CANCELLED: { bg: '#F2F5F7', border: '#7A8A99', text: '#536A80' }
-};
-
-const minutesOf = (time) => {
-  const [h = 0, m = 0] = String(time || '00:00').split(':').map(Number);
-  return h * 60 + m;
-};
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 const mondayOf = (date) => date.subtract((date.day() + 6) % 7, 'day').startOf('day');
@@ -74,7 +59,7 @@ export default function CalendarPage() {
     if (navigation.roomId) setRoomFilter(navigation.roomId);
   }, [navigation.date, navigation.roomId]);
 
-  const days = useMemo(() => Array.from({ length: 6 }, (_, index) => weekStart.add(index, 'day')), [weekStart]);
+  const days = useMemo(() => Array.from({ length: CALENDAR_DAYS }, (_, index) => weekStart.add(index, 'day')), [weekStart]);
   const fromDate = days[0].format('YYYY-MM-DD');
   const toDate = days[days.length - 1].format('YYYY-MM-DD');
 
@@ -86,19 +71,21 @@ export default function CalendarPage() {
   const visibleBookings = useMemo(() => bookings.filter((row) => {
     if (row.date < fromDate || row.date > toDate) return false;
     if (roomFilter && row.roomId !== roomFilter) return false;
-    if (canViewAllBookings) return ['PENDING', 'APPROVED', 'COMPLETED'].includes(row.status);
-    return ['APPROVED', 'COMPLETED'].includes(row.status) || (row.status === 'PENDING' && (row.userId ? row.userId === user?.id : row.user === user?.fullName));
+    if (canViewAllBookings) return BOOKING_STATUS_GROUPS.CALENDAR_MANAGERS.includes(row.status);
+    return BOOKING_STATUS_GROUPS.CALENDAR_PUBLIC.includes(row.status) || (row.status === BOOKING_STATUS.PENDING && (row.userId ? row.userId === user?.id : row.user === user?.fullName));
   }), [bookings, fromDate, toDate, roomFilter, canViewAllBookings, user]);
 
   const openFromGrid = (date, event) => {
     if (!canCreateBooking) return;
     const rect = event.currentTarget.getBoundingClientRect();
-    const y = clamp(event.clientY - rect.top, 0, HOUR_HEIGHT * (END_HOUR - START_HOUR));
-    const roundedMinutes = Math.round((y / HOUR_HEIGHT * 60) / 30) * 30;
-    const totalMinutes = Math.min(START_HOUR * 60 + roundedMinutes, END_HOUR * 60 - 30);
+    const clickY = event.clientY - rect.top;
+    if (clickY < 0 || clickY >= TIMELINE_HEIGHT) return; // Bottom gutter is not a bookable time slot.
+    const y = clamp(clickY, 0, TIMELINE_HEIGHT);
+    const roundedMinutes = Math.round((y / HOUR_HEIGHT * 60) / SNAP_MINUTES) * SNAP_MINUTES;
+    const totalMinutes = Math.min(START_HOUR * 60 + roundedMinutes, END_HOUR * 60 - SNAP_MINUTES);
     const startHour = Math.floor(totalMinutes / 60);
     const startMinute = totalMinutes % 60;
-    const endMinutes = Math.min(totalMinutes + 60, END_HOUR * 60);
+    const endMinutes = Math.min(totalMinutes + BOOKING_DEFAULTS.slotMinutes, END_HOUR * 60);
     const endHour = Math.floor(endMinutes / 60);
     const endMinute = endMinutes % 60;
     const fmt = (h, m) => `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
@@ -106,8 +93,8 @@ export default function CalendarPage() {
   };
 
   const canEdit = (row) => !isReadOnly && (canManageBookings || isOwner(row)) && canChangeBooking(row);
-  const canCancel = (row) => !isReadOnly && (canManageBookings || isOwner(row)) && canChangeBooking(row);
-  const canDelete = (row) => !isReadOnly && (canManageBookings || isOwner(row)) && ['REJECTED', 'CANCELLED'].includes(row.status);
+  const canCancel = (row) => !isReadOnly && canCancelBooking(row, { isManager: canManageBookings, isOwner: isOwner(row) });
+  const canDelete = (row) => !isReadOnly && (canManageBookings || isOwner(row)) && BOOKING_STATUS_GROUPS.DELETABLE.includes(row.status);
 
   const showEdit = (row) => { setViewTarget(null); setEditTarget(row); };
   const showCancel = (row) => { setViewTarget(null); setCancelTarget(row); };
@@ -117,10 +104,10 @@ export default function CalendarPage() {
     <PageHeader
       title="Booking Calendar"
       subtitle={canViewAllBookings ? 'Global calendar: approved and pending requests' : 'Weekly meeting room schedule'}
-      actions={canCreateBooking ? <Button size="small" variant="contained" startIcon={<AddOutlined />} onClick={() => { const date = nextBookableDay(); setCreateState({ date: date.format('YYYY-MM-DD'), startTime: '09:00', endTime: '10:00', room: '' }); }}>New Booking</Button> : null}
+      actions={canCreateBooking ? <Button size="small" variant="contained" startIcon={<AddOutlined />} onClick={() => { const date = nextBookableDay(); setCreateState({ date: date.format('YYYY-MM-DD'), startTime: BOOKING_DEFAULTS.startTime, endTime: BOOKING_DEFAULTS.endTime, room: '' }); }}>New Booking</Button> : null}
     />
     {focusedBooking && <Alert severity="success" sx={{ mb: 1.3 }}>
-      Booking request saved: {focusedBooking.title} · {focusedBooking.date} · {focusedBooking.time}. Status: {focusedBooking.status === 'PENDING' ? 'Pending Admin approval' : focusedBooking.status}.
+      Booking request saved: {focusedBooking.title} · {formatDate(focusedBooking.date)} · {focusedBooking.time}. Status: {focusedBooking.status === BOOKING_STATUS.PENDING ? 'Pending Admin approval' : focusedBooking.status}.
     </Alert>}
     <MainCard content={false}>
       <FilterToolbar sx={{ px: 1.4, py: 1.15, borderBottom: '1px solid #E8EEF5' }}
@@ -150,21 +137,18 @@ export default function CalendarPage() {
           <Box
             sx={{
               position: 'relative',
-              height: HOUR_HEIGHT * (END_HOUR - START_HOUR),
+              height: TIMELINE_HEIGHT + BOTTOM_GUTTER,
               borderRight: '1px solid #E1E8F0',
               bgcolor: '#fff',
-              backgroundImage: 'repeating-linear-gradient(to bottom, transparent 0, transparent 51px, #EDF2F7 51px, #EDF2F7 52px)'
+              backgroundImage: `repeating-linear-gradient(to bottom, transparent 0, transparent ${HOUR_HEIGHT - 1}px, #EDF2F7 ${HOUR_HEIGHT - 1}px, #EDF2F7 ${HOUR_HEIGHT}px)`
             }}
           >
             {HOURS.map((hour, index) => {
-              const isFirst = index === 0;
-              const isLast = index === HOURS.length - 1;
               return <Typography
                 key={hour}
                 sx={{
                   position: 'absolute',
-                  top: isFirst ? 6 : isLast ? 'auto' : index * HOUR_HEIGHT + 4,
-                  bottom: isLast ? 4 : 'auto',
+                  top: index * HOUR_HEIGHT + 4,
                   right: 9,
                   px: .35,
                   lineHeight: 1.2,
@@ -180,12 +164,12 @@ export default function CalendarPage() {
           {days.map((date, dayIndex) => {
             const iso = date.format('YYYY-MM-DD');
             const rows = calculateDayLayout(visibleBookings.filter((row) => row.date === iso));
-            return <Box key={iso} onClick={canCreateBooking ? (event) => openFromGrid(date, event) : undefined} sx={{ position: 'relative', height: HOUR_HEIGHT * (END_HOUR - START_HOUR), cursor: canCreateBooking ? 'crosshair' : 'default', borderRight: dayIndex === days.length - 1 ? 'none' : '1px solid #E1E8F0', backgroundColor: '#fff', backgroundImage: 'repeating-linear-gradient(to bottom, transparent 0, transparent 51px, #EDF2F7 51px, #EDF2F7 52px)' }}>
+            return <Box key={iso} onClick={canCreateBooking ? (event) => openFromGrid(date, event) : undefined} sx={{ position: 'relative', height: TIMELINE_HEIGHT + BOTTOM_GUTTER, cursor: canCreateBooking ? 'crosshair' : 'default', borderRight: dayIndex === days.length - 1 ? 'none' : '1px solid #E1E8F0', backgroundColor: '#fff', backgroundImage: `repeating-linear-gradient(to bottom, transparent 0, transparent ${HOUR_HEIGHT - 1}px, #EDF2F7 ${HOUR_HEIGHT - 1}px, #EDF2F7 ${HOUR_HEIGHT}px)` }}>
               {rows.map((row) => {
                 const [start, end] = String(row.time).split(' - ');
                 const startMinutes = minutesOf(start) - START_HOUR * 60;
                 const duration = Math.max(30, minutesOf(end) - minutesOf(start));
-                const top = clamp(startMinutes / 60 * HOUR_HEIGHT, 0, HOUR_HEIGHT * (END_HOUR - START_HOUR) - 26);
+                const top = clamp(startMinutes / 60 * HOUR_HEIGHT, 0, TIMELINE_HEIGHT - 26);
                 const height = clamp(duration / 60 * HOUR_HEIGHT, 28, HOUR_HEIGHT * 3);
                 const style = statusStyle[row.status] || statusStyle.APPROVED;
                 return <Tooltip key={row.id} title="Click to view actions">
@@ -228,16 +212,17 @@ export default function CalendarPage() {
           ['Room', viewTarget.room], ['Date', formatDate(viewTarget.date)], ['Time', viewTarget.time], ['People', viewTarget.participants]
         ].map(([label, value]) => <Stack key={label} direction="row" justifyContent="space-between" spacing={2}><Typography sx={{ fontSize: '.72rem', color: '#71849A' }}>{label}</Typography><Typography sx={{ fontSize: '.72rem', color: '#314A65', fontWeight: 700, textAlign: 'right' }}>{value}</Typography></Stack>)}
         <Stack direction="row" justifyContent="space-between" alignItems="center"><Typography sx={{ fontSize: '.72rem', color: '#71849A' }}>Status</Typography><StatusChip value={viewTarget.status} /></Stack>
+        {viewTarget.status === BOOKING_STATUS.APPROVED && <Alert severity="info" sx={{ py: .15, fontSize: '.7rem' }}>Approved bookings cannot be edited. Only Admin or Room Manager can cancel them.</Alert>}
         {(isOwner(viewTarget) || canManageBookings) && <BookingHistory bookingId={viewTarget.id} />}
         {viewTarget.rejectReason && <Stack direction="row" justifyContent="space-between" spacing={2}><Typography sx={{ fontSize: '.72rem', color: '#71849A' }}>Reject reason</Typography><Typography sx={{ fontSize: '.72rem', color: '#B42318', fontWeight: 700, textAlign: 'right' }}>{viewTarget.rejectReason}</Typography></Stack>}
       </Stack>}</DialogContent>
       <DialogActions sx={{ flexWrap: 'wrap', gap: .5 }}>
         <Button onClick={() => setViewTarget(null)}>Close</Button>
-        {viewTarget && canEdit(viewTarget) && ['PENDING', 'APPROVED'].includes(viewTarget.status) && <Button startIcon={<EditOutlined />} variant="outlined" onClick={() => showEdit(viewTarget)}>Edit</Button>}
-        {viewTarget && canCancel(viewTarget) && ['PENDING', 'APPROVED'].includes(viewTarget.status) && <Button startIcon={<CancelOutlined />} color="warning" variant="outlined" onClick={() => showCancel(viewTarget)}>Cancel</Button>}
-        {viewTarget && canDelete(viewTarget) && ['REJECTED', 'CANCELLED'].includes(viewTarget.status) && <Button startIcon={<DeleteOutlineOutlined />} color="error" variant="outlined" onClick={() => { setDeleteTarget(viewTarget); setViewTarget(null); }}>Delete</Button>}
-        {canManageBookings && viewTarget?.status === 'PENDING' && <Button startIcon={<CloseOutlined />} color="error" variant="outlined" onClick={() => showReject(viewTarget)}>Reject</Button>}
-        {canManageBookings && viewTarget?.status === 'PENDING' && canChangeBooking(viewTarget) && <Button startIcon={<CheckOutlined />} color="success" variant="contained" onClick={async () => { if (await approveBooking(viewTarget.id)) setViewTarget(null); }}>Approve</Button>}
+        {viewTarget && canEdit(viewTarget) && BOOKING_STATUS_GROUPS.EDITABLE.includes(viewTarget.status) && <Button startIcon={<EditOutlined />} variant="outlined" onClick={() => showEdit(viewTarget)}>Edit</Button>}
+        {viewTarget && canCancel(viewTarget) && BOOKING_STATUS_GROUPS.CANCELLABLE.includes(viewTarget.status) && <Button startIcon={<CancelOutlined />} color="warning" variant="outlined" onClick={() => showCancel(viewTarget)}>Cancel</Button>}
+        {viewTarget && canDelete(viewTarget) && BOOKING_STATUS_GROUPS.DELETABLE.includes(viewTarget.status) && <Button startIcon={<DeleteOutlineOutlined />} color="error" variant="outlined" onClick={() => { setDeleteTarget(viewTarget); setViewTarget(null); }}>Delete</Button>}
+        {canManageBookings && viewTarget?.status === BOOKING_STATUS.PENDING && <Button startIcon={<CloseOutlined />} color="error" variant="outlined" onClick={() => showReject(viewTarget)}>Reject</Button>}
+        {canManageBookings && viewTarget?.status === BOOKING_STATUS.PENDING && canChangeBooking(viewTarget) && <Button startIcon={<CheckOutlined />} color="success" variant="contained" onClick={async () => { if (await approveBooking(viewTarget.id)) setViewTarget(null); }}>Approve</Button>}
       </DialogActions>
     </Dialog>
 

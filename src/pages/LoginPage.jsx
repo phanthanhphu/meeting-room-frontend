@@ -1,3 +1,4 @@
+import { ROLES } from '../constants/access.js';
 import { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { alpha } from '@mui/material/styles';
@@ -41,7 +42,7 @@ export default function LoginPage() {
       setError(result.message);
       return;
     }
-    navigate(location.state?.from || '/dashboard', { replace: true });
+    navigate(location.state?.from || (result.user?.role === ROLES.ADMIN ? '/dashboard' : '/rooms'), { replace: true });
   };
 
   const selectType = (type) => {

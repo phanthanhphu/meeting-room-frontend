@@ -1,4 +1,9 @@
+import { APP_BRANDING } from '../constants/branding.js';
+import { NAV_ITEMS as items, PAGE_META as pageMeta } from '../constants/navigation.js';
+import { LAYOUT_DIMENSIONS } from '../constants/ui.js';
+import { ROLES } from '../constants/access.js';
 import { useMemo, useState } from 'react';
+import { formatDateTime } from '../utils/date.js';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   AppBar, Avatar, Badge, Box, Button, Collapse, Divider, Drawer, IconButton, List, ListItemButton, ListItemIcon, ListItemText,
@@ -6,15 +11,8 @@ import {
 } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
 import MenuRounded from '@mui/icons-material/MenuRounded';
-import DashboardOutlined from '@mui/icons-material/DashboardOutlined';
-import MeetingRoomOutlined from '@mui/icons-material/MeetingRoomOutlined';
-import CalendarMonthOutlined from '@mui/icons-material/CalendarMonthOutlined';
-import EventNoteOutlined from '@mui/icons-material/EventNoteOutlined';
-import FactCheckOutlined from '@mui/icons-material/FactCheckOutlined';
-import ManageAccountsOutlined from '@mui/icons-material/ManageAccountsOutlined';
 import SettingsSuggestOutlined from '@mui/icons-material/SettingsSuggestOutlined';
-import DevicesOtherOutlined from '@mui/icons-material/DevicesOtherOutlined';
-import AssessmentOutlined from '@mui/icons-material/AssessmentOutlined';
+import AdminPanelSettingsOutlined from '@mui/icons-material/AdminPanelSettingsOutlined';
 import LogoutOutlined from '@mui/icons-material/LogoutOutlined';
 import NotificationsNoneOutlined from '@mui/icons-material/NotificationsNoneOutlined';
 import DoneAllRounded from '@mui/icons-material/DoneAllRounded';
@@ -24,9 +22,6 @@ import logoYoungone from '../assets/svg/logos/logo-youngone.png';
 import { useAuth } from '../context/AuthContext';
 import { useAppData } from '../context/AppDataContext';
 
-const DRAWER_WIDTH = 246;
-const MINI_DRAWER_WIDTH = 68;
-const HEADER_HEIGHT = 64;
 
 function notificationTime(value) {
   if (!value) return '';
@@ -40,32 +35,8 @@ function notificationTime(value) {
   if (hours < 24) return `${hours}h ago`;
   const days = Math.floor(hours / 24);
   if (days < 7) return `${days}d ago`;
-  return date.toLocaleDateString();
+  return formatDateTime(value);
 }
-
-const items = [
-  { title: 'Dashboard', path: '/dashboard', icon: DashboardOutlined, section: 'Overview' },
-  { title: 'Meeting Rooms', path: '/rooms', icon: MeetingRoomOutlined, section: 'Booking' },
-  { title: 'My Bookings', path: '/my-bookings', icon: EventNoteOutlined, section: 'Booking' },
-  { title: 'Booking Calendar', path: '/calendar', icon: CalendarMonthOutlined, section: 'Booking' },
-  { title: 'Approvals', path: '/approvals', icon: FactCheckOutlined, section: 'Management', roles: ['VIEWER', 'ROOM_MANAGER', 'ADMIN'] },
-  { title: 'Room Management', path: '/room-management', icon: SettingsSuggestOutlined, section: 'Management', roles: ['VIEWER', 'ROOM_MANAGER', 'ADMIN'] },
-  { title: 'Equipment Catalog', path: '/equipment-management', icon: DevicesOtherOutlined, section: 'Management', roles: ['VIEWER', 'ROOM_MANAGER', 'ADMIN'] },
-  { title: 'User Management', path: '/users', icon: ManageAccountsOutlined, section: 'Management', roles: ['ADMIN'] },
-  { title: 'Reports', path: '/reports', icon: AssessmentOutlined, section: 'Management', roles: ['VIEWER', 'ROOM_MANAGER', 'ADMIN'] }
-];
-
-const pageMeta = {
-  '/dashboard': ['Dashboard', 'Meeting Room Overview'],
-  '/rooms': ['Meeting Rooms', 'Booking Workspace'],
-  '/my-bookings': ['My Bookings', 'Booking Workspace'],
-  '/calendar': ['Booking Calendar', 'Booking Workspace'],
-  '/approvals': ['Approvals', 'Room Management'],
-  '/room-management': ['Room Management', 'Administration'],
-  '/equipment-management': ['Equipment Catalog', 'Administration'],
-  '/users': ['User Management', 'Administration'],
-  '/reports': ['Booking Reports', 'Room Management']
-};
 
 export default function DashboardLayout() {
   const theme = useTheme();
@@ -76,14 +47,16 @@ export default function DashboardLayout() {
   const downLG = useMediaQuery(theme.breakpoints.down('lg'));
   const [open, setOpen] = useState(!downLG);
   const [managementOpen, setManagementOpen] = useState(true);
+  const [adminOpen, setAdminOpen] = useState(true);
   const [anchorEl, setAnchorEl] = useState(null);
   const [notificationAnchorEl, setNotificationAnchorEl] = useState(null);
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const drawerOpen = downLG ? mobileOpen : open;
   const meta = pageMeta[location.pathname] || ['Workspace', 'Meeting Room Booking'];
-  const bookingItems = useMemo(() => items.filter((x) => x.section !== 'Management'), []);
+  const bookingItems = useMemo(() => items.filter((x) => x.section === 'Booking'), []);
   const managementItems = useMemo(() => items.filter((x) => x.section === 'Management' && x.roles?.includes(user?.role)), [user?.role]);
+  const adminItems = useMemo(() => items.filter((x) => x.section === 'Admin' && x.roles?.includes(user?.role)), [user?.role]);
 
   const navItem = (item) => {
     const Icon = item.icon;
@@ -160,11 +133,25 @@ export default function DashboardLayout() {
             <List disablePadding>{managementItems.map(navItem)}</List>
           </Collapse>
         </> : null}
+
+        {adminItems.length ? <>
+          <Divider sx={{ my: 0.9, borderColor: '#EDF2F7' }} />
+          {drawerOpen ? (
+            <ListItemButton onClick={() => setAdminOpen((v) => !v)} sx={{ minHeight: 36, mx: 0.55, px: 1.2, borderRadius: 1.4, color: '#61758B', '&:hover': { bgcolor: '#F4F7FA' } }}>
+              <ListItemIcon sx={{ minWidth: 31, color: '#61758B' }}><AdminPanelSettingsOutlined sx={{ fontSize: 19 }} /></ListItemIcon>
+              <ListItemText primary="Admin" primaryTypographyProps={{ fontSize: '0.8rem', fontWeight: 700 }} />
+              {adminOpen ? <ExpandLess sx={{ fontSize: 18 }} /> : <ExpandMore sx={{ fontSize: 18 }} />}
+            </ListItemButton>
+          ) : null}
+          <Collapse in={!drawerOpen || adminOpen} timeout="auto" unmountOnExit={false}>
+            <List disablePadding>{adminItems.map(navItem)}</List>
+          </Collapse>
+        </> : null}
       </Box>
 
       {drawerOpen ? (
         <Box sx={{ px: 1.4, py: 1.1, borderTop: '1px solid #E8EEF5' }}>
-          <Typography sx={{ fontSize: '0.65rem', color: '#94A3B8', fontWeight: 650 }}>Youngone Internal System</Typography>
+          <Typography sx={{ fontSize: '0.65rem', color: '#94A3B8', fontWeight: 650 }}>{APP_BRANDING.footerCredit}</Typography>
         </Box>
       ) : null}
     </Box>
@@ -177,10 +164,10 @@ export default function DashboardLayout() {
           variant="permanent"
           open={open}
           sx={{
-            width: open ? DRAWER_WIDTH : MINI_DRAWER_WIDTH,
+            width: open ? LAYOUT_DIMENSIONS.drawerWidth : MINI_LAYOUT_DIMENSIONS.drawerWidth,
             flexShrink: 0,
             '& .MuiDrawer-paper': {
-              width: open ? DRAWER_WIDTH : MINI_DRAWER_WIDTH,
+              width: open ? LAYOUT_DIMENSIONS.drawerWidth : MINI_LAYOUT_DIMENSIONS.drawerWidth,
               overflowX: 'hidden',
               borderRight: '1px solid #E6EDF4',
               transition: theme.transitions.create('width', { duration: 180 }),
@@ -194,7 +181,7 @@ export default function DashboardLayout() {
           open={mobileOpen}
           onClose={() => setMobileOpen(false)}
           ModalProps={{ keepMounted: true }}
-          sx={{ '& .MuiDrawer-paper': { width: DRAWER_WIDTH, borderRight: '1px solid #E6EDF4', borderTopRightRadius: 18, borderBottomRightRadius: 18 } }}
+          sx={{ '& .MuiDrawer-paper': { width: LAYOUT_DIMENSIONS.drawerWidth, borderRight: '1px solid #E6EDF4', borderTopRightRadius: 18, borderBottomRightRadius: 18 } }}
         >{drawer}</Drawer>
       )}
 
@@ -203,8 +190,8 @@ export default function DashboardLayout() {
         elevation={0}
         sx={{
           zIndex: theme.zIndex.drawer + 1,
-          ml: downLG ? 0 : `${open ? DRAWER_WIDTH : MINI_DRAWER_WIDTH}px`,
-          width: downLG ? '100%' : `calc(100% - ${open ? DRAWER_WIDTH : MINI_DRAWER_WIDTH}px)`,
+          ml: downLG ? 0 : `${open ? LAYOUT_DIMENSIONS.drawerWidth : MINI_LAYOUT_DIMENSIONS.drawerWidth}px`,
+          width: downLG ? '100%' : `calc(100% - ${open ? LAYOUT_DIMENSIONS.drawerWidth : MINI_LAYOUT_DIMENSIONS.drawerWidth}px)`,
           bgcolor: alpha('#FFFFFF', 0.98),
           color: '#2D4358',
           backdropFilter: 'blur(10px)',
@@ -213,7 +200,7 @@ export default function DashboardLayout() {
           transition: theme.transitions.create(['width', 'margin'], { duration: 180 })
         }}
       >
-        <Toolbar sx={{ minHeight: `${HEADER_HEIGHT}px !important`, px: { xs: 1, sm: 1.5, lg: 2 }, gap: 1 }}>
+        <Toolbar sx={{ minHeight: `${LAYOUT_DIMENSIONS.headerHeight}px !important`, px: { xs: 1, sm: 1.5, lg: 2 }, gap: 1 }}>
           <IconButton onClick={() => downLG ? setMobileOpen(true) : setOpen((v) => !v)} sx={{ width: 36, height: 36, borderRadius: 2.5, color: '#61758B', bgcolor: '#F4F7FA', border: '1px solid #E3EAF2', '&:hover': { bgcolor: '#EEF3F7' } }}>
             <MenuRounded sx={{ fontSize: 20 }} />
           </IconButton>
@@ -283,7 +270,7 @@ export default function DashboardLayout() {
             <Avatar sx={{ width: 38, height: 38, bgcolor: '#EAF1FF', color: '#3F78FF', border: '2px solid #9EBBFF', fontSize: '0.82rem', fontWeight: 800 }}>{user?.initials || user?.fullName?.slice(0, 2).toUpperCase() || 'U'}</Avatar>
           </IconButton>
           <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={() => setAnchorEl(null)} PaperProps={{ sx: { mt: 0.6, minWidth: 220, borderRadius: 2, border: '1px solid #E8EEF5', boxShadow: '0 18px 60px rgba(24,54,84,.14)' } }}>
-            <Box sx={{ px: 2, py: 1.3 }}><Typography sx={{ fontSize: '0.82rem', fontWeight: 800, color: '#183658' }}>{user?.fullName || 'User'}</Typography><Typography sx={{ fontSize: '0.7rem', color: '#71849A' }}>{user?.email || ''}</Typography><Typography sx={{ mt: .2, fontSize: '0.64rem', color: user?.role === 'ADMIN' ? '#7C3AED' : '#4680FF', fontWeight: 800 }}>{user?.role || 'USER'}</Typography></Box>
+            <Box sx={{ px: 2, py: 1.3 }}><Typography sx={{ fontSize: '0.82rem', fontWeight: 800, color: '#183658' }}>{user?.fullName || 'User'}</Typography><Typography sx={{ fontSize: '0.7rem', color: '#71849A' }}>{user?.email || ''}</Typography><Typography sx={{ mt: .2, fontSize: '0.64rem', color: user?.role === ROLES.ADMIN ? '#7C3AED' : '#4680FF', fontWeight: 800 }}>{user?.role || ROLES.USER}</Typography></Box>
             <Divider />
             <MenuItem onClick={() => { logout(); setAnchorEl(null); navigate('/login', { replace: true }); }} sx={{ fontSize: '0.78rem', gap: 1 }}><LogoutOutlined sx={{ fontSize: 18 }} /> Sign out</MenuItem>
           </Menu>
@@ -296,8 +283,8 @@ export default function DashboardLayout() {
         </Alert>
       </Snackbar>
 
-      <Box component="main" sx={{ flexGrow: 1, width: downLG ? '100%' : `calc(100% - ${open ? DRAWER_WIDTH : MINI_DRAWER_WIDTH}px)`, p: { xs: 0.6, sm: 1, md: 1.5 }, transition: theme.transitions.create('width', { duration: 180 }) }}>
-        <Toolbar sx={{ minHeight: `${HEADER_HEIGHT}px !important`, p: 0 }} />
+      <Box component="main" sx={{ flexGrow: 1, width: downLG ? '100%' : `calc(100% - ${open ? LAYOUT_DIMENSIONS.drawerWidth : MINI_LAYOUT_DIMENSIONS.drawerWidth}px)`, p: { xs: 0.6, sm: 1, md: 1.5 }, transition: theme.transitions.create('width', { duration: 180 }) }}>
+        <Toolbar sx={{ minHeight: `${LAYOUT_DIMENSIONS.headerHeight}px !important`, p: 0 }} />
         <Box sx={{ minHeight: 'calc(100vh - 72px)', display: 'flex', flexDirection: 'column' }}>
           <Box sx={{ flex: 1 }}><Outlet /></Box>
           <Box sx={{ px: 0.8, py: 1.2, textAlign: 'center' }}><Typography sx={{ fontSize: '0.66rem', color: '#94A3B8' }}>Meeting Room Booking System</Typography></Box>

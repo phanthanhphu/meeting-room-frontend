@@ -1,3 +1,5 @@
+import { DASHBOARD_CHART_COLORS } from '../constants/ui.js';
+import { BOOKING_STATUS, BOOKING_STATUS_GROUPS } from '../constants/statuses.js';
 import { useMemo, useState } from 'react';
 import dayjs from 'dayjs';
 import { Box, Button, Grid, Paper, Stack, TextField, Typography } from '@mui/material';
@@ -17,7 +19,7 @@ import { formatDate } from '../utils/date';
 import { useAppData } from '../context/AppDataContext';
 import { useAuth } from '../context/AuthContext';
 
-const chartColors = ['#4680FF', '#2CA87F', '#E58A00', '#7C3AED', '#3EC9D6', '#E25563'];
+const chartColors = DASHBOARD_CHART_COLORS;
 
 function Kpi({ label, value, icon: Icon, tone, helper }) {
   return (
@@ -102,13 +104,13 @@ export default function DashboardPage() {
 
   const scopedBookings = useMemo(() => canViewAllBookings ? bookings : bookings.filter((row) => row.userId ? row.userId === user?.id : row.user === user?.fullName), [bookings, canViewAllBookings, user]);
   const filtered = useMemo(() => scopedBookings.filter((row) => (!fromDate || row.date >= fromDate) && (!toDate || row.date <= toDate)), [scopedBookings, fromDate, toDate]);
-  const approvedPeriodRows = useMemo(() => filtered.filter((row) => ['APPROVED', 'COMPLETED'].includes(row.status)), [filtered]);
+  const approvedPeriodRows = useMemo(() => filtered.filter((row) => BOOKING_STATUS_GROUPS.REPORT_ACTIVE.includes(row.status)), [filtered]);
   const roomCounts = useMemo(() => approvedPeriodRows.reduce((acc, row) => ({ ...acc, [row.room]: (acc[row.room] || 0) + 1 }), {}), [approvedPeriodRows]);
   const userCounts = useMemo(() => approvedPeriodRows.reduce((acc, row) => ({ ...acc, [row.user]: (acc[row.user] || 0) + 1 }), {}), [approvedPeriodRows]);
   const topRoom = Object.entries(roomCounts).sort((a, b) => b[1] - a[1])[0] || ['-', 0];
   const topUser = Object.entries(userCounts).sort((a, b) => b[1] - a[1])[0] || ['-', 0];
   const usedRooms = Object.keys(roomCounts).length;
-  const pending = filtered.filter((row) => row.status === 'PENDING').length;
+  const pending = filtered.filter((row) => row.status === BOOKING_STATUS.PENDING).length;
   const approved = approvedPeriodRows.length;
   const invalidDateRange = Boolean(fromDate && toDate && fromDate > toDate);
 

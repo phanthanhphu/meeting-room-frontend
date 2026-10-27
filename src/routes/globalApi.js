@@ -1,8 +1,9 @@
+import { AUTH_STORAGE_KEYS } from '../constants/ui.js';
 import { RUNTIME_NETWORK } from '../config/network.js';
 
 export const API_BASE_URL = RUNTIME_NETWORK.apiBaseUrl;
 export const APP_EVENT_WS_URL = RUNTIME_NETWORK.appEventWsUrl;
-const TOKEN_KEY = 'meetingRoomAuthToken';
+const TOKEN_KEY = AUTH_STORAGE_KEYS.token;
 
 export const authStorage = {
   getToken: () => localStorage.getItem(TOKEN_KEY),
@@ -43,7 +44,8 @@ const jsonBody = (value) => JSON.stringify(value);
 export const globalApi = {
   auth: {
     login: (identifier, password, loginType = 'DOMAIN') => request('/api/auth/login', { method: 'POST', body: jsonBody({ loginType, identifier, username: identifier, password }) }),
-    me: () => request('/api/auth/me')
+    me: () => request('/api/auth/me'),
+    wsTicket: () => request('/api/auth/ws-ticket', { method: 'POST' })
   },
   rooms: {
     list: () => request('/api/rooms'),

@@ -1,9 +1,11 @@
+import { AUTH_STORAGE_KEYS } from '../constants/ui.js';
+import { ROLES } from '../constants/access.js';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import globalApi, { authStorage } from '../routes/globalApi';
 import { canCreateBooking, canManageBookings, canManageRooms, canManageUsers, canViewAllBookings, isReadOnlyViewer } from '../auth/roles';
 
 const AuthContext = createContext(null);
-const AUTH_TYPE_KEY = 'meetingRoomAuthenticationType';
+const AUTH_TYPE_KEY = AUTH_STORAGE_KEYS.authenticationType;
 
 const toUiUser = (user) => user ? ({
   id: user.id,
@@ -84,9 +86,9 @@ export function AuthProvider({ children }) {
     refreshMe,
     authenticationType,
     isAuthenticated: Boolean(user),
-    isAdmin: user?.role === 'ADMIN',
-    isViewer: user?.role === 'VIEWER',
-    isRoomManager: user?.role === 'ROOM_MANAGER',
+    isAdmin: user?.role === ROLES.ADMIN,
+    isViewer: user?.role === ROLES.VIEWER,
+    isRoomManager: user?.role === ROLES.ROOM_MANAGER,
     canViewAllBookings: canViewAllBookings(user),
     canManageBookings: canManageBookings(user),
     canManageRooms: canManageRooms(user),

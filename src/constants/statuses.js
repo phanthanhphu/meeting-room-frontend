@@ -1,0 +1,59 @@
+// API status values; do not rename without changing the backend contract.
+export const BOOKING_STATUS = Object.freeze({
+  PENDING: 'PENDING', APPROVED: 'APPROVED', REJECTED: 'REJECTED',
+  COMPLETED: 'COMPLETED', CANCELLED: 'CANCELLED'
+});
+export const ROOM_STATUS = Object.freeze({
+  ACTIVE: 'ACTIVE', AVAILABLE: 'AVAILABLE', MAINTENANCE: 'MAINTENANCE', DISABLED: 'DISABLED'
+});
+export const EQUIPMENT_STATUS = Object.freeze({
+  ACTIVE: 'ACTIVE', MAINTENANCE: 'MAINTENANCE', INACTIVE: 'INACTIVE'
+});
+export const BOOKING_STATUS_GROUPS = Object.freeze({
+  EDITABLE: Object.freeze([BOOKING_STATUS.PENDING]),
+  CANCELLABLE: Object.freeze([BOOKING_STATUS.PENDING, BOOKING_STATUS.APPROVED]),
+  BLOCKING_USER: Object.freeze([BOOKING_STATUS.PENDING, BOOKING_STATUS.APPROVED]),
+  DELETABLE: Object.freeze([BOOKING_STATUS.REJECTED, BOOKING_STATUS.CANCELLED]),
+  CALENDAR_MANAGERS: Object.freeze([BOOKING_STATUS.PENDING, BOOKING_STATUS.APPROVED, BOOKING_STATUS.COMPLETED]),
+  CALENDAR_PUBLIC: Object.freeze([BOOKING_STATUS.APPROVED, BOOKING_STATUS.COMPLETED]),
+  REPORT_ACTIVE: Object.freeze([BOOKING_STATUS.APPROVED, BOOKING_STATUS.COMPLETED]),
+  REPORT_CLOSED: Object.freeze([BOOKING_STATUS.REJECTED, BOOKING_STATUS.CANCELLED]),
+  REPORT_ORDER: Object.freeze([BOOKING_STATUS.APPROVED, BOOKING_STATUS.COMPLETED, BOOKING_STATUS.PENDING, BOOKING_STATUS.REJECTED, BOOKING_STATUS.CANCELLED])
+});
+
+export const BOOKING_FILTER_OPTIONS = Object.freeze([
+  BOOKING_STATUS.PENDING, BOOKING_STATUS.APPROVED, BOOKING_STATUS.COMPLETED,
+  BOOKING_STATUS.REJECTED, BOOKING_STATUS.CANCELLED
+]);
+export const ROOM_FILTER_STATUS_OPTIONS = Object.freeze([
+  ROOM_STATUS.ACTIVE, ROOM_STATUS.MAINTENANCE, ROOM_STATUS.DISABLED
+]);
+export const EQUIPMENT_FILTER_STATUS_OPTIONS = Object.freeze([
+  EQUIPMENT_STATUS.ACTIVE, EQUIPMENT_STATUS.MAINTENANCE, EQUIPMENT_STATUS.INACTIVE
+]);
+
+export const STATUS_CHIP_COLORS = Object.freeze({
+  APPROVED: { color: '#107D4F', bg: '#EAF8F2', border: '#BFE8D7' },
+  PENDING: { color: '#B56B00', bg: '#FFF7E8', border: '#F4D7A3' },
+  REJECTED: { color: '#B42318', bg: '#FFF1F0', border: '#F5C5C0' },
+  COMPLETED: { color: '#235FBC', bg: '#EDF4FF', border: '#C8DAF9' },
+  CANCELLED: { color: '#61758B', bg: '#F3F6F8', border: '#DDE5EC' },
+  ACTIVE: { color: '#107D4F', bg: '#EAF8F2', border: '#BFE8D7' },
+  MAINTENANCE: { color: '#B56B00', bg: '#FFF7E8', border: '#F4D7A3' },
+  DISABLED: { color: '#61758B', bg: '#F3F6F8', border: '#DDE5EC' }
+});
+
+export const STATUS_BADGE_CONFIG = Object.freeze({
+  PENDING: ['warning', 'Pending'], APPROVED: ['success', 'Approved'],
+  REJECTED: ['error', 'Rejected'], CANCELLED: ['default', 'Cancelled'],
+  COMPLETED: ['info', 'Completed'], AVAILABLE: ['success', 'Available'],
+  MAINTENANCE: ['warning', 'Maintenance'], DISABLED: ['default', 'Disabled']
+});
+
+export const CALENDAR_STATUS_COLORS = Object.freeze({
+  APPROVED: { bg: '#E9F8F2', border: '#2CA87F', text: '#176B50' },
+  PENDING: { bg: '#FFF5E6', border: '#E58A00', text: '#8A5700' },
+  REJECTED: { bg: '#FFEDEF', border: '#DC2626', text: '#9F1D28' },
+  COMPLETED: { bg: '#ECF3FF', border: '#2563EB', text: '#214F97' },
+  CANCELLED: { bg: '#F2F5F7', border: '#7A8A99', text: '#536A80' }
+});

@@ -1,3 +1,6 @@
+import { EQUIPMENT_FORM_DEFAULTS as blank, EQUIPMENT_STATUS_COLORS as statusColors, EQUIPMENT_CODE_SETTINGS } from '../constants/equipment.js';
+import { EQUIPMENT_STATUS, EQUIPMENT_FILTER_STATUS_OPTIONS } from '../constants/statuses.js';
+import { TABLE_PAGE_SIZES } from '../constants/ui.js';
 import { useMemo, useState } from 'react';
 import {
   Alert, Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle, Grid,
@@ -17,25 +20,19 @@ import DataTable from '../components/DataTable';
 import { useAppData } from '../context/AppDataContext';
 import { useAuth } from '../context/AuthContext';
 
-const blank = { code: '', name: '', category: 'DISPLAY', description: '', status: 'ACTIVE' };
 const stats = [
   ['Catalog items', Inventory2Outlined, '#2563EB', '#EFF6FF'],
   ['Ready to use', CheckCircleOutlineRounded, '#059669', '#ECFDF5'],
   ['Maintenance', HandymanOutlined, '#D97706', '#FFFBEB'],
   ['Assigned devices', MeetingRoomOutlined, '#7C3AED', '#F5F3FF']
 ];
-const statusColors = {
-  ACTIVE: { color: '#047857', bgcolor: '#ECFDF5', borderColor: '#A7F3D0' },
-  MAINTENANCE: { color: '#92400E', bgcolor: '#FFFBEB', borderColor: '#FDE68A' },
-  INACTIVE: { color: '#64748B', bgcolor: '#F1F5F9', borderColor: '#CBD5E1' }
-};
 const surface = { border: '1px solid #E5EBF3', borderRadius: 3, boxShadow: '0 8px 26px rgba(34,54,82,.035)' };
 
 export default function EquipmentManagementPage() {
   const { canManageRooms } = useAuth();
   const { equipment, rooms, addEquipment, updateEquipment, deleteEquipment } = useAppData();
   const [editingId, setEditingId] = useState(null);
-  const [form, setForm] = useState(blank);
+  const [form, setForm] = useState(() => ({ ...blank }));
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
@@ -47,10 +44,10 @@ export default function EquipmentManagementPage() {
     ...item,
     categoryLabel: EQUIPMENT_CATEGORIES.find((option) => option.value === item.category)?.label || item.category || '—',
     assignedRooms: usage[item.id] || 0,
-    searchText: [item.code, item.name, item.description, item.category].filter(Boolean).join(' ')
+    searchText: [item.name, item.description, item.category].filter(Boolean).join(' ')
   })), [equipment, usage]);
-  const counts = [equipment.length, equipment.filter((x) => x.status === 'ACTIVE').length, equipment.filter((x) => x.status === 'MAINTENANCE').length, Object.values(usage).reduce((n, count) => n + count, 0)];
-  const startCreate = () => { setForm({ ...blank }); setEditingId(null); setOpen(true); };
+  const counts = [equipment.length, equipment.filter((x) => x.status === EQUIPMENT_STATUS.ACTIVE).length, equipment.filter((x) => x.status === EQUIPMENT_STATUS.MAINTENANCE).length, Object.values(usage).reduce((n, count) => n + count, 0)];
+  const startCreate = () => { const bytes = new Uint8Array(EQUIPMENT_CODE_SETTINGS.randomBytes); window.crypto.getRandomValues(bytes); const code = `${EQUIPMENT_CODE_SETTINGS.prefix}${Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('').toUpperCase()}`; setForm({ ...blank, code }); setEditingId(null); setOpen(true); };
   const startEdit = (item) => { setForm({ code: item.code, name: item.name, category: item.category, description: item.description || '', status: item.status }); setEditingId(item.id); setOpen(true); };
   const save = async () => {
     if (saving) return;
@@ -78,17 +75,17 @@ export default function EquipmentManagementPage() {
       <DataTable
         rows={rows}
         getKey={(item) => item.id}
-        searchFields={[{ key: 'searchText', label: 'Search code, name or description', width: 250 }]}
+        searchFields={[{ key: 'searchText', label: 'Search name or description', width: 250 }]}
         filters={[
           { key: 'category', label: 'Category', options: EQUIPMENT_CATEGORIES },
           { key: 'status', label: 'Status', options: [
-            { value: 'ACTIVE', label: 'Active' },
-            { value: 'MAINTENANCE', label: 'Maintenance' },
-            { value: 'INACTIVE', label: 'Inactive' }
+            { value: EQUIPMENT_STATUS.ACTIVE, label: 'Active' },
+            { value: EQUIPMENT_STATUS.MAINTENANCE, label: 'Maintenance' },
+            { value: EQUIPMENT_STATUS.INACTIVE, label: 'Inactive' }
           ] }
         ]}
         initialPageSize={10}
-        pageSizeOptions={[10, 20, 50, 100]}
+        pageSizeOptions={TABLE_PAGE_SIZES}
         columns={[
           {
             key: 'name', label: 'Equipment name',
@@ -99,7 +96,6 @@ export default function EquipmentManagementPage() {
               <Typography sx={{ fontSize: '.76rem', fontWeight: 800, color: '#17345A' }}>{item.name}</Typography>
             </Stack>
           },
-          { key: 'code', label: 'Code', render: (item) => <Typography sx={{ fontSize: '.74rem', fontWeight: 750, color: '#376CB3' }}>{item.code}</Typography> },
           { key: 'categoryLabel', label: 'Category', render: (item) => <Typography sx={{ fontSize: '.74rem', color: '#556D87' }}>{item.categoryLabel}</Typography> },
           {
             key: 'description', label: 'Description',
@@ -114,7 +110,7 @@ export default function EquipmentManagementPage() {
           {
             key: 'status', label: 'Status',
             render: (item) => <Chip
-              label={item.status === 'ACTIVE' ? 'Active' : item.status === 'INACTIVE' ? 'Inactive' : 'Maintenance'}
+              label={item.status === EQUIPMENT_STATUS.ACTIVE ? 'Active' : item.status === EQUIPMENT_STATUS.INACTIVE ? 'Inactive' : 'Maintenance'}
               size="small" variant="outlined"
               sx={{ ...statusColors[item.status], height: 25, fontSize: '.68rem', fontWeight: 750 }}
             />
@@ -139,8 +135,8 @@ export default function EquipmentManagementPage() {
     </Paper>
     <Dialog open={open} onClose={saving ? undefined : () => setOpen(false)} fullWidth maxWidth="sm" PaperProps={{ sx: { borderRadius: 3 } }}>
       <DialogTitle sx={{ color: '#18365F', fontWeight: 800, pb: 1 }}>{editingId ? 'Edit equipment' : 'Add equipment'}<Typography sx={{ color: '#8293A7', fontSize: '.75rem', mt: .35 }}>This device type can be used by multiple meeting rooms.</Typography></DialogTitle>
-      <DialogContent dividers><Stack spacing={1.7} sx={{ pt: 1 }}><Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.4}><TextField label="Equipment code" required fullWidth value={form.code} onChange={(e) => setForm((f) => ({ ...f, code: e.target.value }))} size="small" inputProps={{ maxLength: 40 }} /><TextField label="Equipment name" required fullWidth value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} size="small" inputProps={{ maxLength: 120 }} /></Stack><TextField label="Equipment type" select value={form.category} onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))} fullWidth size="small">{EQUIPMENT_CATEGORIES.map((x) => <MenuItem key={x.value} value={x.value}><Stack direction="row" alignItems="center" gap={1}><EquipmentIcon item={{ category: x.value }} size={19} />{x.label}</Stack></MenuItem>)}</TextField><TextField label="Status" select fullWidth size="small" value={form.status} onChange={(e) => setForm((f) => ({ ...f, status: e.target.value }))}>{['ACTIVE', 'MAINTENANCE', 'INACTIVE'].map((x) => <MenuItem key={x} value={x}>{x}</MenuItem>)}</TextField><TextField label="Description (optional)" size="small" multiline minRows={2} fullWidth value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} inputProps={{ maxLength: 500 }} />{editingId && Boolean(usage[editingId]) && form.status === 'INACTIVE' && <Alert severity="warning">Remove this equipment from {usage[editingId]} assigned room(s) before marking it inactive.</Alert>}</Stack></DialogContent>
-      <DialogActions sx={{ p: 2 }}><Button disabled={saving} onClick={() => setOpen(false)}>Cancel</Button><Button variant="contained" disabled={saving || !form.code.trim() || !form.name.trim() || form.description.length > 500 || (editingId && usage[editingId] > 0 && form.status === 'INACTIVE')} onClick={save}>{saving ? 'Saving...' : editingId ? 'Save changes' : 'Create equipment'}</Button></DialogActions>
+      <DialogContent dividers><Stack spacing={1.7} sx={{ pt: 1 }}><Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.4}><TextField label="Equipment name" required fullWidth value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} size="small" inputProps={{ maxLength: 120 }} /></Stack><TextField label="Equipment type" select value={form.category} onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))} fullWidth size="small">{EQUIPMENT_CATEGORIES.map((x) => <MenuItem key={x.value} value={x.value}><Stack direction="row" alignItems="center" gap={1}><EquipmentIcon item={{ category: x.value }} size={19} />{x.label}</Stack></MenuItem>)}</TextField><TextField label="Status" select fullWidth size="small" value={form.status} onChange={(e) => setForm((f) => ({ ...f, status: e.target.value }))}>{EQUIPMENT_FILTER_STATUS_OPTIONS.map((x) => <MenuItem key={x} value={x}>{x}</MenuItem>)}</TextField><TextField label="Description (optional)" size="small" multiline minRows={2} fullWidth value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} inputProps={{ maxLength: 500 }} />{editingId && Boolean(usage[editingId]) && form.status === EQUIPMENT_STATUS.INACTIVE && <Alert severity="warning">Remove this equipment from {usage[editingId]} assigned room(s) before marking it inactive.</Alert>}</Stack></DialogContent>
+      <DialogActions sx={{ p: 2 }}><Button disabled={saving} onClick={() => setOpen(false)}>Cancel</Button><Button variant="contained" disabled={saving || !form.code.trim() || !form.name.trim() || form.description.length > 500 || (editingId && usage[editingId] > 0 && form.status === EQUIPMENT_STATUS.INACTIVE)} onClick={save}>{saving ? 'Saving...' : editingId ? 'Save changes' : 'Create equipment'}</Button></DialogActions>
     </Dialog>
     <ConfirmDialog open={Boolean(deleteTarget)} title="Delete equipment" message={deleteTarget ? `Delete “${deleteTarget.name}” from the catalog?` : ''} confirmText={busyDelete ? 'Deleting...' : 'Delete'} onClose={() => !busyDelete && setDeleteTarget(null)} onConfirm={async () => { if (busyDelete || !deleteTarget) return; setBusyDelete(true); try { if (await deleteEquipment(deleteTarget.id)) setDeleteTarget(null); } finally { setBusyDelete(false); } }} />
   </Box>;
