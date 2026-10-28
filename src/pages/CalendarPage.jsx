@@ -1,6 +1,6 @@
 import { HOUR_HEIGHT, START_HOUR, END_HOUR, BOTTOM_GUTTER, TIMELINE_HEIGHT, HOURS, CALENDAR_DAYS, SNAP_MINUTES } from '../constants/calendar.js';
 import { CALENDAR_STATUS_COLORS as statusStyle, BOOKING_STATUS, BOOKING_STATUS_GROUPS } from '../constants/statuses.js';
-import { BOOKING_DEFAULTS } from '../constants/booking.js';
+import { BOOKING_DEFAULTS, BOOKING_LIMITS } from '../constants/booking.js';
 import { useEffect, useMemo, useState } from 'react';
 import dayjs from 'dayjs';
 import { useLocation } from 'react-router-dom';
@@ -32,6 +32,37 @@ import BookingHistory from '../components/BookingHistory';
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 const mondayOf = (date) => date.subtract((date.day() + 6) % 7, 'day').startOf('day');
 const nextBookableDay = (date = dayjs()) => date.day() === 0 ? date.add(1, 'day') : date;
+
+// Tooltip is rendered in a Popper portal so short events never clip booking details.
+function BookingHoverDetails({ booking }) {
+  const details = [
+    ['Room', booking.room],
+    ['Date', formatDate(booking.date)],
+    ['Time', booking.time],
+    ['Booked by', booking.user],
+    ['Department', booking.department],
+    ['People', booking.participants],
+    ['Status', booking.status]
+  ];
+  if (booking.note) details.push(['Purpose', booking.note]);
+
+  return <Box sx={{ minWidth: 230, maxWidth: 340, p: .5 }}>
+    <Typography sx={{ fontSize: '.84rem', fontWeight: 800, color: '#173B63', mb: .85, overflowWrap: 'anywhere' }}>
+      {booking.title}
+    </Typography>
+    <Stack spacing={.55}>
+      {details.map(([label, value]) => <Stack key={label} direction="row" spacing={1.5} justifyContent="space-between" alignItems="flex-start">
+        <Typography sx={{ flexShrink: 0, fontSize: '.7rem', color: '#71849A' }}>{label}</Typography>
+        <Typography sx={{ fontSize: '.7rem', fontWeight: 700, color: '#314A65', textAlign: 'right', overflowWrap: 'anywhere', whiteSpace: 'pre-wrap' }}>
+          {value ?? '-'}
+        </Typography>
+      </Stack>)}
+    </Stack>
+    <Typography sx={{ mt: .85, pt: .75, borderTop: '1px solid #E8EEF5', fontSize: '.64rem', color: '#71849A' }}>
+      Click to view details and actions
+    </Typography>
+  </Box>;
+}
 
 export default function CalendarPage() {
   const { user, canViewAllBookings, canManageBookings, canCreateBooking, isReadOnly } = useAuth();
@@ -168,20 +199,35 @@ export default function CalendarPage() {
               {rows.map((row) => {
                 const [start, end] = String(row.time).split(' - ');
                 const startMinutes = minutesOf(start) - START_HOUR * 60;
-                const duration = Math.max(30, minutesOf(end) - minutesOf(start));
-                const top = clamp(startMinutes / 60 * HOUR_HEIGHT, 0, TIMELINE_HEIGHT - 26);
-                const height = clamp(duration / 60 * HOUR_HEIGHT, 28, HOUR_HEIGHT * 3);
+                // Respect the actual booking duration (including 15-minute slots), avoiding
+                // visual overlap with a following booking in the same room.
+                const duration = Math.max(BOOKING_LIMITS.minMinutes, minutesOf(end) - minutesOf(start));
+                const height = clamp(duration / 60 * HOUR_HEIGHT, BOOKING_LIMITS.minMinutes / 60 * HOUR_HEIGHT, HOUR_HEIGHT * 3);
+                const top = clamp(startMinutes / 60 * HOUR_HEIGHT, 0, TIMELINE_HEIGHT - height);
                 const style = statusStyle[row.status] || statusStyle.APPROVED;
-                return <Tooltip key={row.id} title="Click to view actions">
+                return <Tooltip
+                  key={row.id}
+                  title={<BookingHoverDetails booking={row} />}
+                  placement="top"
+                  arrow
+                  enterDelay={0}
+                  enterNextDelay={0}
+                  disableInteractive
+                  componentsProps={{
+                    tooltip: { sx: { bgcolor: '#FFFFFF', color: '#314A65', maxWidth: 380, border: '1px solid #E1E8F0', boxShadow: '0 8px 28px rgba(23,59,99,.18)', borderRadius: 1.5 } },
+                    arrow: { sx: { color: '#FFFFFF', '&::before': { border: '1px solid #E1E8F0' } } }
+                  }}
+                >
                   <Box
                     onClick={(event) => { event.stopPropagation(); setViewTarget(row); }}
                     role="button" tabIndex={0} aria-label={`View ${row.title}, ${row.room}, ${start} to ${end}`}
                     onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); setViewTarget(row); } }}
-                    sx={{ position: 'absolute', outline: navigation.bookingId === row.id ? '2px solid #2563EB' : 'none', outlineOffset: navigation.bookingId === row.id ? 1 : 0, left: `calc(${(row.column / row.columns) * 100}% + 3px)`, width: `calc(${100 / row.columns}% - 6px)`, top, height, bgcolor: style.bg, borderLeft: `3px solid ${style.border}`, borderRadius: 1.1, px: .8, py: .55, overflow: 'hidden', cursor: 'pointer', zIndex: 2, '&:hover': { boxShadow: '0 4px 14px rgba(23,59,99,.16)', transform: 'translateY(-1px)' } }}
+                    sx={{ position: 'absolute', outline: navigation.bookingId === row.id ? '2px solid #2563EB' : 'none', outlineOffset: navigation.bookingId === row.id ? 1 : 0, left: `calc(${(row.column / row.columns) * 100}% + 3px)`, width: `calc(${100 / row.columns}% - 6px)`, top, height, bgcolor: style.bg, borderLeft: `3px solid ${style.border}`, borderRadius: 1.1, px: .65, py: height < 26 ? .2 : .4, overflow: 'hidden', cursor: 'pointer', zIndex: 2, '&:hover': { boxShadow: '0 4px 14px rgba(23,59,99,.16)', transform: 'translateY(-1px)', zIndex: 3 } }}
                   >
-                    <Typography sx={{ fontSize: '.69rem', fontWeight: 800, color: style.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{row.title}</Typography>
-                    <Typography sx={{ mt: .12, fontSize: '.61rem', color: '#61758B', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{row.room}</Typography>
-                    {height > 48 && <Typography sx={{ mt: .1, fontSize: '.58rem', color: '#71849A' }}>{start} - {end} · {row.user}</Typography>}
+                    <Typography sx={{ fontSize: '.69rem', fontWeight: 800, lineHeight: 1.2, color: style.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{row.title}</Typography>
+                    {height >= 32 && <Typography sx={{ mt: .2, fontSize: '.6rem', lineHeight: 1.2, color: '#61758B', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{start} - {end}</Typography>}
+                    {height >= 50 && <Typography sx={{ mt: .2, fontSize: '.61rem', lineHeight: 1.2, color: '#61758B', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{row.room}</Typography>}
+                    {height >= 69 && <Typography sx={{ mt: .2, fontSize: '.58rem', lineHeight: 1.2, color: '#71849A', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{row.user}</Typography>}
                   </Box>
                 </Tooltip>;
               })}

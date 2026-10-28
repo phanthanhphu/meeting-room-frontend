@@ -1,7 +1,8 @@
 import { BOOKING_LIMITS, BOOKING_DEFAULTS } from './booking.js';
 
 // Geometry must be shared by hour labels, booking blocks, and click positioning.
-export const HOUR_HEIGHT = 52;
+// More vertical room for compact booking cards, while keeping the same time-to-position scale.
+export const HOUR_HEIGHT = 72;
 export const START_HOUR = Number(BOOKING_LIMITS.start.slice(0, 2));
 export const END_HOUR = Number(BOOKING_LIMITS.end.slice(0, 2));
 export const BOTTOM_GUTTER = 24; // Keeps the 18:00 label clear of the bottom border.
