@@ -8,9 +8,9 @@ import { AuthProvider } from './context/AuthContext';
 import { AppDataProvider } from './context/AppDataContext';
 import './index.css';
 
-// NATF favicon: apply the centered calendar icon without replacing index.html.
+// NATF favicon: restore the original centered icon without replacing index.html.
 // BASE_URL keeps the asset path correct if Vite is deployed under a subpath.
-const faviconHref = `${import.meta.env.BASE_URL}meeting-room-favicon-centered.png?v=4`;
+const faviconHref = `${import.meta.env.BASE_URL}meeting-room-favicon-centered.png?v=20261104-old`;
 let faviconLink = document.querySelector('link[rel~="icon"]');
 if (!faviconLink) {
   faviconLink = document.createElement('link');
