@@ -7,6 +7,7 @@ import ManageAccountsOutlined from '@mui/icons-material/ManageAccountsOutlined';
 import SettingsSuggestOutlined from '@mui/icons-material/SettingsSuggestOutlined';
 import DevicesOtherOutlined from '@mui/icons-material/DevicesOtherOutlined';
 import AssessmentOutlined from '@mui/icons-material/AssessmentOutlined';
+import MarkEmailReadOutlined from '@mui/icons-material/MarkEmailReadOutlined';
 import { ACCESS_ROLES } from './access.js';
 
 export const NAV_ITEMS = Object.freeze([
@@ -17,6 +18,7 @@ export const NAV_ITEMS = Object.freeze([
   { title: 'Approvals', path: '/approvals', icon: FactCheckOutlined, section: 'Management', roles: ACCESS_ROLES.MANAGEMENT },
   { title: 'Room Management', path: '/room-management', icon: SettingsSuggestOutlined, section: 'Management', roles: ACCESS_ROLES.MANAGEMENT },
   { title: 'Equipment Catalog', path: '/equipment-management', icon: DevicesOtherOutlined, section: 'Management', roles: ACCESS_ROLES.MANAGEMENT },
+  { title: 'Email Management', path: '/email-management', icon: MarkEmailReadOutlined, section: 'Admin', roles: ACCESS_ROLES.USERS },
   { title: 'User Management', path: '/users', icon: ManageAccountsOutlined, section: 'Admin', roles: ACCESS_ROLES.USERS },
   { title: 'Reports', path: '/reports', icon: AssessmentOutlined, section: 'Management', roles: ACCESS_ROLES.MANAGEMENT }
 ]);
@@ -30,5 +32,6 @@ export const PAGE_META = Object.freeze({
   '/room-management': ['Room Management', 'Administration'],
   '/equipment-management': ['Equipment Catalog', 'Administration'],
   '/users': ['User Management', 'Administration'],
+  '/email-management': ['Email Management', 'Administration'],
   '/reports': ['Booking Reports', 'Room Management']
 });

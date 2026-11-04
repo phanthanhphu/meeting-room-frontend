@@ -11,7 +11,7 @@ export const authStorage = {
   clear: () => localStorage.removeItem(TOKEN_KEY)
 };
 
-async function request(path, options = {}) {
+export async function request(path, options = {}) {
   const headers = new Headers(options.headers || {});
   if (options.body !== undefined && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
   const token = authStorage.getToken();

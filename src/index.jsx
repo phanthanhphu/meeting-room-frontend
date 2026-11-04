@@ -8,6 +8,19 @@ import { AuthProvider } from './context/AuthContext';
 import { AppDataProvider } from './context/AppDataContext';
 import './index.css';
 
+// NATF favicon: apply the centered calendar icon without replacing index.html.
+// BASE_URL keeps the asset path correct if Vite is deployed under a subpath.
+const faviconHref = `${import.meta.env.BASE_URL}meeting-room-favicon-centered.png?v=4`;
+let faviconLink = document.querySelector('link[rel~="icon"]');
+if (!faviconLink) {
+  faviconLink = document.createElement('link');
+  faviconLink.rel = 'icon';
+  document.head.appendChild(faviconLink);
+}
+faviconLink.type = 'image/png';
+faviconLink.setAttribute('sizes', '64x64');
+faviconLink.href = faviconHref;
+
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <ThemeProvider theme={theme}>
