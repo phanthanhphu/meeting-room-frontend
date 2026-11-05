@@ -313,14 +313,14 @@ export function AppDataProvider({ children }) {
   }, [isReadOnly, canManageBookings, refreshBookings, notify, fail]);
 
   const deleteBooking = useCallback(async (id) => {
-    if (isReadOnly) return fail(new Error('This account is read-only and cannot delete bookings.'));
+    if (!isAdmin) return fail(new Error('Only ADMIN can permanently delete bookings.'));
     try {
-      if (canManageBookings) await globalApi.admin.bookings.delete(id); else await globalApi.bookings.delete(id);
+      await globalApi.admin.bookings.delete(id);
       setBookings((current) => current.filter((row) => row.id !== id));
-      notify('Booking deleted.');
+      notify('Booking permanently deleted.');
       return true;
     } catch (error) { return fail(error, 'Unable to delete booking.'); }
-  }, [isReadOnly, canManageBookings, notify, fail]);
+  }, [isAdmin, notify, fail]);
 
   const approveBooking = useCallback(async (id) => {
     if (!canManageBookings) return fail(new Error('Room Manager or Admin permission is required.'));

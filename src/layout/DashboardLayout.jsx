@@ -164,10 +164,10 @@ export default function DashboardLayout() {
           variant="permanent"
           open={open}
           sx={{
-            width: open ? LAYOUT_DIMENSIONS.drawerWidth : MINI_LAYOUT_DIMENSIONS.drawerWidth,
+            width: open ? LAYOUT_DIMENSIONS.drawerWidth : LAYOUT_DIMENSIONS.miniDrawerWidth,
             flexShrink: 0,
             '& .MuiDrawer-paper': {
-              width: open ? LAYOUT_DIMENSIONS.drawerWidth : MINI_LAYOUT_DIMENSIONS.drawerWidth,
+              width: open ? LAYOUT_DIMENSIONS.drawerWidth : LAYOUT_DIMENSIONS.miniDrawerWidth,
               overflowX: 'hidden',
               borderRight: '1px solid #E6EDF4',
               transition: theme.transitions.create('width', { duration: 180 }),
@@ -190,8 +190,8 @@ export default function DashboardLayout() {
         elevation={0}
         sx={{
           zIndex: theme.zIndex.drawer + 1,
-          ml: downLG ? 0 : `${open ? LAYOUT_DIMENSIONS.drawerWidth : MINI_LAYOUT_DIMENSIONS.drawerWidth}px`,
-          width: downLG ? '100%' : `calc(100% - ${open ? LAYOUT_DIMENSIONS.drawerWidth : MINI_LAYOUT_DIMENSIONS.drawerWidth}px)`,
+          ml: downLG ? 0 : `${open ? LAYOUT_DIMENSIONS.drawerWidth : LAYOUT_DIMENSIONS.miniDrawerWidth}px`,
+          width: downLG ? '100%' : `calc(100% - ${open ? LAYOUT_DIMENSIONS.drawerWidth : LAYOUT_DIMENSIONS.miniDrawerWidth}px)`,
           bgcolor: alpha('#FFFFFF', 0.98),
           color: '#2D4358',
           backdropFilter: 'blur(10px)',
@@ -283,7 +283,7 @@ export default function DashboardLayout() {
         </Alert>
       </Snackbar>
 
-      <Box component="main" sx={{ flexGrow: 1, width: downLG ? '100%' : `calc(100% - ${open ? LAYOUT_DIMENSIONS.drawerWidth : MINI_LAYOUT_DIMENSIONS.drawerWidth}px)`, p: { xs: 0.6, sm: 1, md: 1.5 }, transition: theme.transitions.create('width', { duration: 180 }) }}>
+      <Box component="main" sx={{ flexGrow: 1, width: downLG ? '100%' : `calc(100% - ${open ? LAYOUT_DIMENSIONS.drawerWidth : LAYOUT_DIMENSIONS.miniDrawerWidth}px)`, p: { xs: 0.6, sm: 1, md: 1.5 }, transition: theme.transitions.create('width', { duration: 180 }) }}>
         <Toolbar sx={{ minHeight: `${LAYOUT_DIMENSIONS.headerHeight}px !important`, p: 0 }} />
         <Box sx={{ minHeight: 'calc(100vh - 72px)', display: 'flex', flexDirection: 'column' }}>
           <Box sx={{ flex: 1 }}><Outlet /></Box>

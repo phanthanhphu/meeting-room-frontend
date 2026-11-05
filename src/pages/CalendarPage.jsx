@@ -65,7 +65,7 @@ function BookingHoverDetails({ booking }) {
 }
 
 export default function CalendarPage() {
-  const { user, canViewAllBookings, canManageBookings, canCreateBooking, isReadOnly } = useAuth();
+  const { user, isAdmin, canViewAllBookings, canManageBookings, canCreateBooking, isReadOnly } = useAuth();
   const { search } = useLocation();
   const navigation = useMemo(() => {
     const params = new URLSearchParams(search);
@@ -125,7 +125,7 @@ export default function CalendarPage() {
 
   const canEdit = (row) => !isReadOnly && (canManageBookings || isOwner(row)) && canChangeBooking(row);
   const canCancel = (row) => !isReadOnly && canCancelBooking(row, { isManager: canManageBookings, isOwner: isOwner(row) });
-  const canDelete = (row) => !isReadOnly && (canManageBookings || isOwner(row)) && BOOKING_STATUS_GROUPS.DELETABLE.includes(row.status);
+  const canDelete = () => isAdmin;
 
   const showEdit = (row) => { setViewTarget(null); setEditTarget(row); };
   const showCancel = (row) => { setViewTarget(null); setCancelTarget(row); };
@@ -266,7 +266,7 @@ export default function CalendarPage() {
         <Button onClick={() => setViewTarget(null)}>Close</Button>
         {viewTarget && canEdit(viewTarget) && BOOKING_STATUS_GROUPS.EDITABLE.includes(viewTarget.status) && <Button startIcon={<EditOutlined />} variant="outlined" onClick={() => showEdit(viewTarget)}>Edit</Button>}
         {viewTarget && canCancel(viewTarget) && BOOKING_STATUS_GROUPS.CANCELLABLE.includes(viewTarget.status) && <Button startIcon={<CancelOutlined />} color="warning" variant="outlined" onClick={() => showCancel(viewTarget)}>Cancel</Button>}
-        {viewTarget && canDelete(viewTarget) && BOOKING_STATUS_GROUPS.DELETABLE.includes(viewTarget.status) && <Button startIcon={<DeleteOutlineOutlined />} color="error" variant="outlined" onClick={() => { setDeleteTarget(viewTarget); setViewTarget(null); }}>Delete</Button>}
+        {viewTarget && canDelete(viewTarget) && <Button startIcon={<DeleteOutlineOutlined />} color="error" variant="outlined" onClick={() => { setDeleteTarget(viewTarget); setViewTarget(null); }}>Delete</Button>}
         {canManageBookings && viewTarget?.status === BOOKING_STATUS.PENDING && <Button startIcon={<CloseOutlined />} color="error" variant="outlined" onClick={() => showReject(viewTarget)}>Reject</Button>}
         {canManageBookings && viewTarget?.status === BOOKING_STATUS.PENDING && canChangeBooking(viewTarget) && <Button startIcon={<CheckOutlined />} color="success" variant="contained" onClick={async () => { if (await approveBooking(viewTarget.id)) setViewTarget(null); }}>Approve</Button>}
       </DialogActions>
@@ -279,6 +279,6 @@ export default function CalendarPage() {
     </Dialog>
 
     <ConfirmDialog open={Boolean(cancelTarget)} title="Cancel Booking" message={cancelTarget ? `Cancel ${cancelTarget.id} - ${cancelTarget.title}?` : ''} confirmText="Cancel Booking" confirmColor="warning" onClose={() => setCancelTarget(null)} onConfirm={async () => { if (await cancelBooking(cancelTarget.id)) setCancelTarget(null); }} />
-    <ConfirmDialog open={Boolean(deleteTarget)} title="Delete Booking" message={deleteTarget ? `Delete ${deleteTarget.id}? This action cannot be undone.` : ''} confirmText="Delete" onClose={() => setDeleteTarget(null)} onConfirm={async () => { if (await deleteBooking(deleteTarget.id)) setDeleteTarget(null); }} />
+    <ConfirmDialog open={Boolean(deleteTarget)} title="Delete Booking" message={deleteTarget ? `Permanently delete “${deleteTarget.title}” (${deleteTarget.status}) on ${formatDate(deleteTarget.date)}? The booking and its history will be removed. This cannot be undone. No email will be sent.` : ''} confirmText="Delete" onClose={() => setDeleteTarget(null)} onConfirm={async () => { if (await deleteBooking(deleteTarget.id)) setDeleteTarget(null); }} />
   </Box>;
 }

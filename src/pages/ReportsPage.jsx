@@ -2,7 +2,7 @@ import { BOOKING_STATUS, BOOKING_STATUS_GROUPS } from '../constants/statuses.js'
 import { useMemo, useState } from 'react';
 import { downloadBookingReportXlsx } from '../utils/exportBookingReportXlsx';
 import dayjs from 'dayjs';
-import { Box, Button, Grid, MenuItem, Paper, Stack, TextField, Typography } from '@mui/material';
+import { Box, Button, Grid, IconButton, MenuItem, Paper, Stack, TextField, Tooltip, Typography } from '@mui/material';
 import DownloadOutlined from '@mui/icons-material/DownloadOutlined';
 import RestartAltOutlined from '@mui/icons-material/RestartAltOutlined';
 import SearchOutlined from '@mui/icons-material/SearchOutlined';
@@ -10,11 +10,14 @@ import AssessmentOutlined from '@mui/icons-material/AssessmentOutlined';
 import CheckCircleOutline from '@mui/icons-material/CheckCircleOutline';
 import PendingActionsOutlined from '@mui/icons-material/PendingActionsOutlined';
 import HighlightOffOutlined from '@mui/icons-material/HighlightOffOutlined';
+import DeleteOutlineOutlined from '@mui/icons-material/DeleteOutlineOutlined';
 import MainCard from '../components/MainCard';
 import PageHeader from '../components/PageHeader';
 import FilterToolbar from '../components/FilterToolbar';
 import DataTable from '../components/DataTable';
 import StatusChip from '../components/StatusChip';
+import ConfirmDialog from '../components/ConfirmDialog';
+import { useAuth } from '../context/AuthContext';
 import { useAppData } from '../context/AppDataContext';
 import { formatDate } from '../utils/date';
 
@@ -28,7 +31,9 @@ function Kpi({ label, value, icon: Icon, tone }) {
 }
 
 export default function ReportsPage() {
-  const { loading, bookings, rooms, showNotification } = useAppData();
+  const { isAdmin } = useAuth();
+  const { loading, bookings, rooms, deleteBooking, showNotification } = useAppData();
+  const [deleteTarget, setDeleteTarget] = useState(null);
   const [fromDate, setFromDate] = useState(() => dayjs().startOf('month').format('YYYY-MM-DD'));
   const [toDate, setToDate] = useState(() => dayjs().endOf('month').format('YYYY-MM-DD'));
   const [room, setRoom] = useState('');
@@ -136,9 +141,20 @@ export default function ReportsPage() {
           { key: 'date', label: 'Date', render: (row) => formatDate(row.date) },
           { key: 'time', label: 'Time' },
           { key: 'participants', label: 'People', align: 'center' },
-          { key: 'status', label: 'Status', render: (row) => <StatusChip value={row.status} /> }
+          { key: 'status', label: 'Status', render: (row) => <StatusChip value={row.status} /> },
+          ...(isAdmin ? [{ key: 'actions', label: 'Actions', align: 'right', sortable: false,
+            render: (row) => <Tooltip title="Permanently delete booking"><IconButton aria-label={`Delete booking ${row.title}`} color="error" size="small" onClick={() => setDeleteTarget(row)}><DeleteOutlineOutlined fontSize="small" /></IconButton></Tooltip>
+          }] : [])
         ]}
       />
     </MainCard>
+    <ConfirmDialog
+      open={Boolean(deleteTarget)}
+      title="Permanently Delete Booking"
+      message={deleteTarget ? `Delete “${deleteTarget.title}” (${deleteTarget.status}) on ${formatDate(deleteTarget.date)}? This deletes the booking and its history, cannot be undone, and removes it from reports and the calendar. No email will be sent.` : ''}
+      confirmText="Delete Permanently"
+      onClose={() => setDeleteTarget(null)}
+      onConfirm={async () => { if (deleteTarget && await deleteBooking(deleteTarget.id)) setDeleteTarget(null); }}
+    />
   </Box>;
 }

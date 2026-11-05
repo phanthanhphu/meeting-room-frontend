@@ -33,6 +33,29 @@ const EMPTY_SENDER = { id: null, email: '', displayName: 'Meeting Room Booking',
   smtpUsername: '', smtpPassword: '', smtpHost: 'pop3.youngonevn.com', smtpPort: '30475', smtpSecurity: 'STARTTLS' };
 const EMPTY_RULES = { pending: true, approved: true, rejected: true, cancelled: true };
 
+// The editor is arranged in the same order as the email: Title first, then its Content.
+const USER_DETAIL_ITEMS = [
+  { id: 'meetingTitle', name: 'Subject / Meeting title', title: 'detailsTitle', content: 'meetingTitleValue', token: '{bookingTitle}' },
+  { id: 'date', name: 'Date', title: 'dateLabel', content: 'dateValue', token: '{date}' },
+  { id: 'time', name: 'Time', title: 'timeLabel', content: 'timeValue', token: '{time}' },
+  { id: 'room', name: 'Meeting Room', title: 'roomLabel', content: 'roomValue', token: '{roomName}' },
+  { id: 'location', name: 'Location', title: 'locationLabel', content: 'locationValue', token: '{location}' },
+];
+const ADMIN_DETAIL_ITEMS = [
+  { id: 'requestedBy', name: 'Requested By', title: 'requestedByLabel', content: 'requestedByValue', token: '{requesterName}' },
+  { id: 'room', name: 'Meeting Room', title: 'roomLabel', content: 'roomValue', token: '{roomName}' },
+  { id: 'location', name: 'Location', title: 'locationLabel', content: 'locationValue', token: '{location}' },
+  { id: 'date', name: 'Date', title: 'dateLabel', content: 'dateValue', token: '{date}' },
+  { id: 'time', name: 'Time', title: 'timeLabel', content: 'timeValue', token: '{time}' },
+  { id: 'meetingTitle', name: 'Meeting Title', title: 'meetingTitleLabel', content: 'meetingTitleValue', token: '{bookingTitle}' },
+  { id: 'purpose', name: 'Purpose', title: 'purposeLabel', content: 'purposeValue', token: '{purpose}' },
+  { id: 'attendees', name: 'Attendees', title: 'attendeesLabel', content: 'attendeesValue', token: '{attendees}' },
+  { id: 'processedBy', name: 'Processed By', title: 'processedByLabel', content: 'processedByValue', token: '{managerName}', skipWhenCreated: true },
+];
+const TEMPLATE_TOKENS = ['{bookingId}', '{bookingTitle}', '{roomName}', '{location}', '{date}', '{time}',
+  '{requesterName}', '{managerName}', '{purpose}', '{attendees}', '{adminNote}', '{bookingUrl}', '{websiteUrl}', '{status}'];
+const editorGroupSx = { p: 1.7, border: '1px solid #E2EAF4', borderRadius: 2.5, bgcolor: '#FAFCFF' };
+
 const panelSx = { border: '1px solid #E4EBF3', boxShadow: 'none', borderRadius: 2.5, p: { xs: 1.5, sm: 2 }, bgcolor: '#fff' };
 const muted = { color: '#71849A', fontSize: '.78rem' };
 const heading = { color: '#1A3857', fontWeight: 800, fontSize: '1rem' };
@@ -68,6 +91,11 @@ export default function EmailManagementPage() {
   const [templateEvent, setTemplateEvent] = useState('CREATED');
   const [template, setTemplate] = useState(null);
   const [previewBusy, setPreviewBusy] = useState(false);
+  const [templateEditor, setTemplateEditor] = useState(null);
+  const [templateDraft, setTemplateDraft] = useState({});
+  const [editorPreview, setEditorPreview] = useState(null);
+  const [editorBusy, setEditorBusy] = useState('');
+
 
   const reload = useCallback(async () => {
     // /website-link was added later than the original mail-management APIs.
@@ -124,6 +152,55 @@ export default function EmailManagementPage() {
     finally { setBusy(''); }
   };
 
+  const refreshTemplatePreview = async () => {
+    const { data } = await api.get(`${BASE}/templates/${templateEvent}`);
+    setTemplate(data);
+    return data;
+  };
+
+  const openTemplateEditor = async audience => {
+    setEditorBusy('loading'); setError('');
+    try {
+      const [{ data: editor }, { data: preview }] = await Promise.all([
+        api.get(`${BASE}/templates/${templateEvent}/editor/${audience}`),
+        api.get(`${BASE}/templates/${templateEvent}`)
+      ]);
+      setTemplateEditor(editor); setTemplateDraft({ ...editor.fields }); setEditorPreview(preview);
+    } catch (e) { setError(errorMessage(e)); }
+    finally { setEditorBusy(''); }
+  };
+  const renderTemplateDraft = async () => {
+    if (!templateEditor || editorBusy) return;
+    setEditorBusy('preview'); setError('');
+    try {
+      const { data } = await api.post(`${BASE}/templates/${templateEditor.eventType}/preview/${templateEditor.audience}`,
+        { fields: templateDraft });
+      setEditorPreview(data);
+    } catch (e) { setError(errorMessage(e)); }
+    finally { setEditorBusy(''); }
+  };
+  const saveTemplateDraft = async () => {
+    if (!templateEditor || editorBusy) return;
+    setEditorBusy('save'); setError('');
+    try {
+      await api.put(`${BASE}/templates/${templateEditor.eventType}/editor/${templateEditor.audience}`,
+        { fields: templateDraft });
+      await refreshTemplatePreview();
+      setTemplateEditor(null); setEditorPreview(null); setToast('Email template saved. New emails will use the updated template.');
+    } catch (e) { setError(errorMessage(e)); }
+    finally { setEditorBusy(''); }
+  };
+  const resetTemplateDraft = async () => {
+    if (!templateEditor || editorBusy || !window.confirm('Restore this email template to the default design and text?')) return;
+    setEditorBusy('reset'); setError('');
+    try {
+      await api.delete(`${BASE}/templates/${templateEditor.eventType}/editor/${templateEditor.audience}`);
+      await refreshTemplatePreview();
+      setTemplateEditor(null); setEditorPreview(null); setToast('Email template restored to default.');
+    } catch (e) { setError(errorMessage(e)); }
+    finally { setEditorBusy(''); }
+  };
+
   const startEditSender = sender => setSenderEditor(sender
     ? { ...sender, smtpPassword: '', smtpPort: String(sender.smtpPort) }
     : { ...EMPTY_SENDER, smtpHost: status?.smtpGatewayHost || EMPTY_SENDER.smtpHost,
@@ -172,6 +249,25 @@ export default function EmailManagementPage() {
   })();
   const defaultSender = senders.find(x => x.defaultSender);
   const readySenders = senders.filter(x => x.enabled && x.hasPassword);
+  const templateField = (key, label, note = '', multiline = false) => (
+    <TextField key={key} fullWidth size="small" label={label} multiline={multiline}
+      minRows={multiline ? 2 : undefined} value={templateDraft[key] ?? ''}
+      onChange={e => setTemplateDraft(prev => ({ ...prev, [key]: e.target.value }))}
+      helperText={note || undefined} />
+  );
+  const detailItem = item => (
+    <Box key={item.id} sx={{ p: 1.5, border: '1px solid #E4EAF2', borderRadius: 2, bgcolor: '#fff' }}>
+      <Typography sx={{ fontWeight: 750, color: '#183A5B', fontSize: '.88rem', mb: 1.5 }}>{item.name}</Typography>
+      <Stack gap={1.5}>
+        {templateField(item.title, 'Title', 'Edit the displayed label, or leave blank to hide its title.')}
+        {templateField(item.content, 'Content', `Use ${item.token} to automatically show the actual booking value. Leave blank to hide the content.`)}
+      </Stack>
+    </Box>
+  );
+  const visibleDetailItems = templateEditor?.audience === 'ADMIN'
+    ? ADMIN_DETAIL_ITEMS.filter(x => !x.skipWhenCreated || templateEditor.eventType !== 'CREATED')
+    : USER_DETAIL_ITEMS;
+
 
   if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', py: 10 }}><CircularProgress size={30} /></Box>;
   return <Box sx={{ px: { xs: .5, sm: 1 }, pb: 4 }}>
@@ -291,7 +387,7 @@ export default function EmailManagementPage() {
     </Paper>}
 
     {tab === 3 && <Paper sx={panelSx}>
-      {sectionHeader('Email template preview', 'Actual backend templates with sample booking data — changes require a source update')}
+      {sectionHeader('Email templates', 'Edit each User / Admin template separately. Saved changes are used by new email notifications.')}
       <Stack direction={{ xs: 'column', sm: 'row' }} gap={2} sx={{ mb: 2 }}>
         <TextField select label="Booking event" value={templateEvent} onChange={e => setTemplateEvent(e.target.value)} size="small" sx={{ minWidth: 275 }}>
           {EVENT_INFO.map(e => <MenuItem key={e.type} value={e.type}>{e.label}</MenuItem>)}
@@ -306,7 +402,13 @@ export default function EmailManagementPage() {
             <Grid item xs={12} lg={6} key={x.title}>
               <Card variant="outlined" sx={{ borderRadius: 2, overflow: 'hidden' }}>
                 <Box sx={{ p: 1.5, borderBottom: '1px solid #E6EBF2', bgcolor: '#F8FAFD' }}>
-                  <Chip size="small" label={x.title} color={i ? 'primary' : 'success'} sx={{ mb: 1 }} />
+                  <Stack direction="row" alignItems="center" justifyContent="space-between" gap={1} sx={{ mb: 1 }}>
+                    <Chip size="small" label={x.title} color={i ? 'primary' : 'success'} />
+                    <Button size="small" variant="outlined" startIcon={<EditOutlined />} disabled={Boolean(editorBusy)}
+                      onClick={() => openTemplateEditor(i ? 'ADMIN' : 'USER')}>
+                      Edit template
+                    </Button>
+                  </Stack>
                   <Typography fontSize=".75rem" fontWeight={700} sx={{ overflowWrap: 'anywhere' }}>{x.subject}</Typography>
                 </Box>
                 <iframe title={x.title} srcDoc={x.html} sandbox="" style={{ width: '100%', minHeight: 570, border: 0, background: '#F1F5F9' }} />
@@ -338,6 +440,112 @@ export default function EmailManagementPage() {
       </TableBody></Table></TableContainer>
       <Typography sx={{ ...muted, mt: 1.5 }}>Email delivery status indicates SMTP acceptance, not confirmation the message reached the recipient's inbox.</Typography>
     </Paper>}
+
+    <Dialog fullWidth maxWidth="lg" open={Boolean(templateEditor)} onClose={() => !editorBusy && setTemplateEditor(null)}>
+      <DialogTitle sx={heading}>
+        Edit Email Template — {templateEditor?.eventType} / {templateEditor?.audience}
+      </DialogTitle>
+      {templateEditor && <DialogContent dividers>
+        <Alert severity="info" sx={{ mb: 2 }}>
+          You can change, replace or leave a Title empty to hide it. Variables are automatically filled when emails are queued.
+          Existing queued or sent emails are not changed. Preview does not send an email.
+        </Alert>
+        <Box sx={{ mb: 2 }}><Typography variant="caption" fontWeight={700} color="text.secondary">Available dynamic variables</Typography>
+          <Stack direction="row" flexWrap="wrap" gap={.5} mt={.7}>
+            {TEMPLATE_TOKENS.map(t => <Chip key={t} label={t} size="small" variant="outlined" onClick={() => {
+              navigator.clipboard?.writeText(t).catch(() => {});
+            }} />)}
+          </Stack>
+        </Box>
+        <Grid container spacing={2}>
+          <Grid item xs={12} md={6}>
+            <Stack gap={2.2}>
+              <Paper variant="outlined" sx={editorGroupSx}>
+                <Typography sx={{ ...heading, mb: 1.5 }}>Email subject</Typography>
+                {templateField('subject', 'Subject', 'Required. Supports {bookingTitle}, {roomName}, etc.')}
+              </Paper>
+
+              <Paper variant="outlined" sx={editorGroupSx}>
+                <Typography sx={{ ...heading, mb: 1.5 }}>Email header</Typography>
+                <Stack gap={1.7}>
+                  {templateField('brandTitle', 'Title', 'Leave blank to hide the brand title.')}
+                  {templateField('brandSubtitle', 'Content / Subtitle', 'Leave blank to hide the subtitle.')}
+                </Stack>
+              </Paper>
+
+              <Paper variant="outlined" sx={editorGroupSx}>
+                <Typography sx={{ ...heading, mb: 1.5 }}>Main message</Typography>
+                <Stack gap={1.7}>
+                  {templateField('heading', 'Title', 'The main title above the message. Blank hides the title.')}
+                  {templateField('statusLabel', 'Status title', 'Optional status badge, e.g. PENDING APPROVAL.')}
+                  {templateField('greeting', 'Greeting', 'Example: Dear {requesterName},')}
+                  {templateField('intro', 'Content', 'The introductory message below the title. Blank hides the paragraph.', true)}
+                </Stack>
+              </Paper>
+
+              <Paper variant="outlined" sx={editorGroupSx}>
+                <Typography sx={heading}>Meeting details</Typography>
+                <Typography sx={{ ...muted, mb: 2, mt: .5 }}>
+                  Edit every Title above its Content. The default values are dynamic, so each email uses its own booking data.
+                </Typography>
+                <Stack gap={1.5}>
+                  {visibleDetailItems.map(detailItem)}
+                  {templateEditor.eventType === 'REJECTED' && detailItem({
+                    id: 'rejectionReason', name: 'Rejection reason', title: 'rejectionReasonLabel',
+                    content: 'rejectionReasonValue', token: '{adminNote}'
+                  })}
+                </Stack>
+              </Paper>
+
+              <Paper variant="outlined" sx={editorGroupSx}>
+                <Typography sx={{ ...heading, mb: 1.5 }}>Closing message</Typography>
+                {templateField('outro', 'Content', 'Leave blank to hide the closing paragraph.', true)}
+              </Paper>
+
+              <Paper variant="outlined" sx={editorGroupSx}>
+                <Typography sx={{ ...heading, mb: 1.5 }}>Action button</Typography>
+                <Stack gap={1.7}>
+                  {templateField('buttonText', 'Button Title', 'Leave blank to hide the button.')}
+                  {templateField('buttonUrl', 'Dynamic Link', 'Use {bookingUrl}, {websiteUrl} or HTTPS link with {bookingId}. Blank hides the button.')}
+                </Stack>
+              </Paper>
+
+              <Paper variant="outlined" sx={editorGroupSx}>
+                <Typography sx={{ ...heading, mb: 1.5 }}>Footer</Typography>
+                {templateField('footer', 'Content', 'Leave blank to hide the footer text.', true)}
+              </Paper>
+            </Stack>
+          </Grid>
+          <Grid item xs={12} md={6}>
+            <Box sx={{ position: { md: 'sticky' }, top: 8 }}>
+              <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
+                <Typography sx={heading}>Preview (sample booking)</Typography>
+                <Button size="small" variant="outlined" startIcon={<PreviewOutlined />} onClick={renderTemplateDraft}
+                  disabled={Boolean(editorBusy)}>{editorBusy === 'preview' ? 'Loading...' : 'Preview changes'}</Button>
+              </Stack>
+              <Typography sx={{ fontSize: '.8rem', mb: 1, fontWeight: 700, overflowWrap: 'anywhere' }}>
+                {templateEditor.audience === 'USER' ? editorPreview?.userSubject : editorPreview?.adminSubject}
+              </Typography>
+              <Box sx={{ border: '1px solid #E3E9F1', borderRadius: 2, overflow: 'hidden' }}>
+                <iframe title="Email template draft preview" sandbox=""
+                  srcDoc={templateEditor.audience === 'USER' ? editorPreview?.userHtml || '' : editorPreview?.adminHtml || ''}
+                  style={{ display: 'block', width: '100%', height: 610, border: 0, background: '#F3F6FA' }} />
+              </Box>
+              <Typography sx={{ ...muted, mt: 1 }}>Click Preview changes to render your unsaved edits without sending an email.</Typography>
+            </Box>
+          </Grid>
+        </Grid>
+        {error && <Alert severity="error" sx={{ mt: 2 }} onClose={() => setError('')}>{error}</Alert>}
+      </DialogContent>}
+      <DialogActions sx={{ p: 2, gap: 1, flexWrap: 'wrap' }}>
+        <Button color="error" variant="outlined" disabled={Boolean(editorBusy) || !templateEditor?.customized}
+          startIcon={<RefreshOutlined />} onClick={resetTemplateDraft}>Restore default</Button>
+        <Box sx={{ flexGrow: 1 }} />
+        <Button disabled={Boolean(editorBusy)} onClick={() => { setTemplateEditor(null); setEditorPreview(null); }}>Cancel</Button>
+        <Button variant="contained" startIcon={<SaveOutlined />} disabled={Boolean(editorBusy) || !templateDraft.subject?.trim()}
+          onClick={saveTemplateDraft}>{editorBusy === 'save' ? 'Saving...' : 'Save template'}</Button>
+      </DialogActions>
+    </Dialog>
 
     <Dialog fullWidth maxWidth="sm" open={Boolean(senderEditor)} onClose={() => !busy && setSenderEditor(null)}>
       <DialogTitle sx={heading}>{senderEditor?.id ? 'Edit SMTP sender' : 'Add SMTP sender'}</DialogTitle>

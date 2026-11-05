@@ -1,4 +1,4 @@
-import { BOOKING_FILTER_OPTIONS, BOOKING_STATUS_GROUPS } from '../constants/statuses.js';
+import { BOOKING_FILTER_OPTIONS } from '../constants/statuses.js';
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, Stack, Tooltip, Typography } from '@mui/material';
@@ -22,7 +22,7 @@ import { useAppData } from '../context/AppDataContext';
 
 export default function MyBookingsPage() {
   const navigate = useNavigate();
-  const { user, canCreateBooking, canManageBookings, isReadOnly } = useAuth();
+  const { user, isAdmin, canCreateBooking, canManageBookings, isReadOnly } = useAuth();
   const { loading, bookings, rooms, updateBooking, cancelBooking, deleteBooking } = useAppData();
   const rows = useMemo(() => bookings.filter((row) => row.userId ? row.userId === user?.id : row.user === user?.fullName), [bookings, user]);
   const [viewTarget, setViewTarget] = useState(null);
@@ -62,7 +62,7 @@ export default function MyBookingsPage() {
             <Tooltip title="View"><IconButton size="small" onClick={() => setViewTarget(row)}><VisibilityOutlined sx={{ fontSize: 17 }} /></IconButton></Tooltip>
             {!isReadOnly && canChangeBooking(row) && <Tooltip title="Edit"><IconButton size="small" onClick={() => setEditTarget(row)}><EditOutlined sx={{ fontSize: 17 }} /></IconButton></Tooltip>}
             {!isReadOnly && canCancelBooking(row, { isManager: canManageBookings, isOwner: true }) && <Tooltip title="Cancel"><IconButton size="small" color="warning" onClick={() => setCancelTarget(row)}><CancelOutlined sx={{ fontSize: 17 }} /></IconButton></Tooltip>}
-            {!isReadOnly && BOOKING_STATUS_GROUPS.DELETABLE.includes(row.status) && <Tooltip title="Delete"><IconButton size="small" color="error" onClick={() => setDeleteTarget(row)}><DeleteOutlineOutlined sx={{ fontSize: 17 }} /></IconButton></Tooltip>}
+            {isAdmin && <Tooltip title="Delete"><IconButton size="small" color="error" onClick={() => setDeleteTarget(row)}><DeleteOutlineOutlined sx={{ fontSize: 17 }} /></IconButton></Tooltip>}
           </Stack> }
         ]}
       />
@@ -74,6 +74,6 @@ export default function MyBookingsPage() {
 
     <BookingDialog open={Boolean(editTarget)} onClose={() => setEditTarget(null)} booking={editTarget} rooms={rooms} onSave={async (form) => { if (await updateBooking(editTarget.id, form)) setEditTarget(null); }} />
     <ConfirmDialog open={Boolean(cancelTarget)} title="Cancel Booking" message={cancelTarget ? `Cancel “${cancelTarget.title}” on ${formatDate(cancelTarget.date)}?` : ''} confirmText="Cancel Booking" confirmColor="warning" onClose={() => setCancelTarget(null)} onConfirm={async () => { if (await cancelBooking(cancelTarget.id)) setCancelTarget(null); }} />
-    <ConfirmDialog open={Boolean(deleteTarget)} title="Delete Booking" message={deleteTarget ? `Delete “${deleteTarget.title}” on ${formatDate(deleteTarget.date)}? This action cannot be undone.` : ''} confirmText="Delete" onClose={() => setDeleteTarget(null)} onConfirm={async () => { if (await deleteBooking(deleteTarget.id)) setDeleteTarget(null); }} />
+    <ConfirmDialog open={Boolean(deleteTarget)} title="Delete Booking" message={deleteTarget ? `Permanently delete “${deleteTarget.title}” (${deleteTarget.status}) on ${formatDate(deleteTarget.date)}? The booking and its history will be removed. This cannot be undone. No email will be sent.` : ''} confirmText="Delete" onClose={() => setDeleteTarget(null)} onConfirm={async () => { if (await deleteBooking(deleteTarget.id)) setDeleteTarget(null); }} />
   </Box>;
 }
