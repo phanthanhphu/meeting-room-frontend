@@ -12,6 +12,7 @@ const mapRoom = (room) => ({
   id: room.id,
   code: room.code,
   name: room.name,
+  color: room.color || '',
   location: room.location,
   capacity: room.capacity,
   description: room.description || '',
@@ -23,6 +24,7 @@ const mapRoom = (room) => ({
 const roomPayload = (room) => ({
   code: String(room.code || '').trim(),
   name: String(room.name || '').trim(),
+  color: room.color || '',
   location: String(room.location || '').trim(),
   capacity: Number(room.capacity || 0),
   description: room.description || '',

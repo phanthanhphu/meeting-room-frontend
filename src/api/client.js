@@ -19,5 +19,5 @@ const api = {
   delete: (path) => send('DELETE', path),
 };
 
-export const errorMessage = (error) => error?.message || 'Có lỗi xảy ra';
+export const errorMessage = (error) => error?.message || 'An unexpected error occurred.';
 export default api;

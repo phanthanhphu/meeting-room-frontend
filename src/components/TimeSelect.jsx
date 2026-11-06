@@ -11,10 +11,10 @@ const availableTimes = Object.freeze(Array.from({ length: (minutesOf(BOOKING_LIM
   return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
 }));
 
-export default function TimeSelect({ label, value, onChange, min = BOOKING_LIMITS.start, max = BOOKING_LIMITS.end, ...props }) {
+export default function TimeSelect({ label, value, onChange, min = BOOKING_LIMITS.start, max = BOOKING_LIMITS.end, preserveCurrentValue = true, ...props }) {
   const options = availableTimes.filter((time) => time >= min && time <= max);
   // Preserve an existing, off-grid time rather than silently changing the record.
-  const selected = options.includes(value) ? options : [...options, value].filter(Boolean).sort();
+  const selected = (preserveCurrentValue && value && !options.includes(value)) ? [...options, value].sort() : options;
   return <TextField select label={label} value={value || ''} onChange={onChange} {...props}>
     {selected.map((time) => <MenuItem key={time} value={time}>{formatTime(time)}</MenuItem>)}
   </TextField>;

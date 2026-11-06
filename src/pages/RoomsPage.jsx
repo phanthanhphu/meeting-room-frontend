@@ -6,9 +6,9 @@ import { ROOM_FILTER_DEFAULTS, ROOM_SLOT_DEFAULTS, ALL_FILTER_VALUE } from '../c
 import { TABLE_PAGE_SIZES } from '../constants/ui.js';
 import { useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import dayjs from 'dayjs';
 import globalApi from '../routes/globalApi';
 import { overlaps, minutesOf, BOOKING_LIMITS } from '../utils/bookingRules';
+import { minimumStartTime, minimumEndTime, timeFromMinutes, nextBookingSlot, isBookableDate, bookingDateNotice, bookingStartNotice } from '../utils/bookingDate';
 import { Alert, Box, Button, Chip, InputAdornment, MenuItem, Paper, Stack, TextField, Tooltip, Typography } from '@mui/material';
 import AddRounded from '@mui/icons-material/AddRounded';
 import GroupsOutlined from '@mui/icons-material/GroupsOutlined';
@@ -20,6 +20,7 @@ import PageHeader from '../components/PageHeader';
 import FilterToolbar from '../components/FilterToolbar';
 import DataTable from '../components/DataTable';
 import BookingDialog from '../components/BookingDialog';
+import BookingTimeNotice from '../components/BookingTimeNotice';
 import { useAppData } from '../context/AppDataContext';
 import { useAuth } from '../context/AuthContext';
 
@@ -39,6 +40,7 @@ export default function RoomsPage() {
   const [slotLoading, setSlotLoading] = useState(false);
   const searchVersion = useRef(0);
   const [slotError, setSlotError] = useState('');
+  const [bookingTimeNotice, setBookingTimeNotice] = useState('');
   const [query, setQuery] = useState('');
   const [location, setLocation] = useState(ALL_FILTER_VALUE);
   const [status, setStatus] = useState(ROOM_STATUS.ACTIVE);
@@ -57,13 +59,13 @@ export default function RoomsPage() {
     const requestId = ++searchVersion.current;
     if (availableDate) {
       const duration = minutesOf(endTime) - minutesOf(startTime);
-      if (availableDate < dayjs().format('YYYY-MM-DD') || availableDate > dayjs().add(BOOKING_LIMITS.advanceDays, 'day').format('YYYY-MM-DD') || dayjs(availableDate).day() === 0) {
-        setSlotError('Choose a Monday–Saturday date within the next 90 days.'); return;
-      }
+      const dateNotice = bookingDateNotice(availableDate);
+      if (dateNotice) { setBookingTimeNotice(dateNotice); return; }
       if (duration < BOOKING_LIMITS.minMinutes || duration > BOOKING_LIMITS.maxMinutes || startTime < BOOKING_LIMITS.start || endTime > BOOKING_LIMITS.end) {
-        setSlotError('Choose a valid slot between 07:00 and 18:00, lasting 15–240 minutes.'); return;
+        setSlotError('Choose a valid slot between 07:00 and 18:00, lasting 15 minutes to 11 hours.'); return;
       }
-      if (!dayjs(`${availableDate}T${startTime}`).isAfter(dayjs())) { setSlotError('Choose a future start time.'); return; }
+      const startNotice = bookingStartNotice(availableDate, startTime);
+      if (startNotice) { setBookingTimeNotice(startNotice); return; }
       setSlotLoading(true); setSlotError(''); setAppliedSlot(null);
       try {
         const rows = await globalApi.bookings.occupied(availableDate);
@@ -72,6 +74,20 @@ export default function RoomsPage() {
       finally { if (requestId === searchVersion.current) setSlotLoading(false); }
     } else { setAppliedSlot(null); setSlotError(''); }
     setApplied({ query, location, status, deviceId, minCapacity });
+  };
+  const changeAvailableDate = (event) => {
+    const date = event.target.value;
+    const notice = date ? bookingDateNotice(date) : '';
+    if (notice) { setBookingTimeNotice(notice); return; }
+    setAvailableDate(date);
+    if (isBookableDate(date)) {
+      const minStart = minimumStartTime(date);
+      const nextStart = minStart > BOOKING_DEFAULTS.latestStartTime ? nextBookingSlot().startTime : minStart;
+      if (startTime < nextStart) {
+        setStartTime(nextStart);
+        setEndTime(timeFromMinutes(Math.min(minutesOf(nextStart) + BOOKING_DEFAULTS.slotMinutes, minutesOf(BOOKING_LIMITS.end))));
+      }
+    }
   };
   const reset = () => { ++searchVersion.current; setSlotLoading(false); setAvailableDate(''); setStartTime(ROOM_SLOT_DEFAULTS.startTime); setEndTime(ROOM_SLOT_DEFAULTS.endTime); setAppliedSlot(null); setSlotError(''); setQuery(''); setLocation(ALL_FILTER_VALUE); setStatus(ROOM_STATUS.ACTIVE); setDeviceId(ALL_FILTER_VALUE); setMinCapacity(''); setApplied({ ...ROOM_FILTER_DEFAULTS }); };
   const startBooking = (roomId = '') => { setDefaultRoom(roomId); setBookingDefaults(appliedSlot); setOpen(true); };
@@ -102,8 +118,8 @@ export default function RoomsPage() {
         <TextField select label="Floor / location" size="small" value={location} onChange={(e) => setLocation(e.target.value)}><MenuItem value="ALL">All locations</MenuItem>{allLocations.map((v) => <MenuItem key={v} value={v}>{v}</MenuItem>)}</TextField>
         <TextField select label="Equipment" size="small" value={deviceId} onChange={(e) => setDeviceId(e.target.value)}><MenuItem value="ALL">Any equipment</MenuItem>{equipment.filter((x) => x.status !== 'INACTIVE').map((v) => <MenuItem value={v.id} key={v.id}>{v.name}</MenuItem>)}</TextField>
         <TextField select label="Status" size="small" value={status} onChange={(e) => setStatus(e.target.value)}><MenuItem value="ALL">All statuses</MenuItem><MenuItem value="ACTIVE">Active / bookable</MenuItem><MenuItem value="MAINTENANCE">Maintenance</MenuItem><MenuItem value="DISABLED">Disabled</MenuItem></TextField>
-        <TextField label="Free on date (optional)" type="date" size="small" value={availableDate} onChange={(e) => setAvailableDate(e.target.value)} InputLabelProps={{ shrink: true }} inputProps={{ min: dayjs().format('YYYY-MM-DD'), max: dayjs().add(BOOKING_LIMITS.advanceDays, 'day').format('YYYY-MM-DD') }} />
-        {availableDate && <><TimeSelect label="From" size="small" value={startTime} onChange={(e) => setStartTime(e.target.value)} max={BOOKING_DEFAULTS.latestStartTime} /><TimeSelect label="To" size="small" value={endTime} onChange={(e) => setEndTime(e.target.value)} min={BOOKING_DEFAULTS.earliestEndTime} /></>}
+        <TextField label="Free on date (optional)" type="date" size="small" value={availableDate} onChange={changeAvailableDate} InputLabelProps={{ shrink: true }}  />
+        {availableDate && <><TimeSelect label="From" size="small" value={startTime} onChange={(e) => { const value = e.target.value; const notice = bookingStartNotice(availableDate, value); if (notice) { setBookingTimeNotice(notice); return; } setStartTime(value); if (endTime <= value) setEndTime(timeFromMinutes(Math.min(minutesOf(value) + BOOKING_DEFAULTS.slotMinutes, minutesOf(BOOKING_LIMITS.end)))); }} min={BOOKING_LIMITS.start} max={BOOKING_DEFAULTS.latestStartTime} preserveCurrentValue={false} /><TimeSelect label="To" size="small" value={endTime} onChange={(e) => setEndTime(e.target.value)} min={minimumEndTime(startTime)} preserveCurrentValue={false} /></>}
         <TextField label="Min. seats" size="small" type="number" value={minCapacity} onChange={(e) => setMinCapacity(e.target.value)} inputProps={{ min: 1, step: 1 }} sx={{ maxWidth: { md: 135 } }} />
       </FilterToolbar>
     </Paper>
@@ -165,6 +181,7 @@ export default function RoomsPage() {
       />
     </Paper>
     {!visible.length && <Alert severity="info" sx={{ mt: 1.5 }}>No meeting rooms match your filters. Change the search criteria or select Reset.</Alert>}
+    <BookingTimeNotice message={bookingTimeNotice} onClose={() => setBookingTimeNotice('')} />
     <BookingDialog open={open} onClose={() => setOpen(false)} onSave={saveBooking} rooms={rooms} defaultRoom={defaultRoom} defaultDate={bookingDefaults?.date} defaultStartTime={bookingDefaults?.start} defaultEndTime={bookingDefaults?.end} />
   </Box>;
 }

@@ -1,6 +1,6 @@
 // This frontend copy must stay synchronized with backend app.booking settings.
 export const BOOKING_LIMITS = Object.freeze({
-  start: '07:00', end: '18:00', minMinutes: 15, maxMinutes: 240, advanceDays: 90
+  start: '07:00', end: '18:00', minMinutes: 15, maxMinutes: 660, advanceDays: 90
 });
 
 export const BOOKING_DEFAULTS = Object.freeze({

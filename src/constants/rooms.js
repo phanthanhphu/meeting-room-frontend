@@ -10,6 +10,6 @@ export const ROOM_SLOT_DEFAULTS = Object.freeze({
   startTime: BOOKING_DEFAULTS.startTime, endTime: BOOKING_DEFAULTS.endTime
 });
 export const ROOM_FORM_DEFAULTS = Object.freeze({
-  code: '', name: '', location: '', capacity: 4,
+  code: '', name: '', color: '', location: '', capacity: 4,
   equipmentIds: [], description: '', status: ROOM_STATUS.ACTIVE
 });

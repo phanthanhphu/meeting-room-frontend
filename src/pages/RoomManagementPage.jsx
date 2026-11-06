@@ -1,4 +1,5 @@
 import { ROOM_FORM_DEFAULTS } from '../constants/rooms.js';
+import { ROOM_COLOR_OPTIONS, isRoomColor, roomAccent, roomTint } from '../constants/roomColors.js';
 import { ROOM_STATUS, EQUIPMENT_STATUS, ROOM_FILTER_STATUS_OPTIONS } from '../constants/statuses.js';
 import { useMemo, useState } from 'react';
 import {
@@ -44,12 +45,16 @@ export default function RoomManagementPage() {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const activeEquipment = useMemo(() => equipment.filter((item) => item.status !== EQUIPMENT_STATUS.INACTIVE && (`${item.name} ${item.code} ${item.category}`).toLowerCase().includes(deviceSearch.trim().toLowerCase())), [equipment, deviceSearch]);
   const grouped = EQUIPMENT_CATEGORIES.map((group) => ({ ...group, options: activeEquipment.filter((device) => device.category === group.value) })).filter((group) => group.options.length);
+  const usedColors = useMemo(() => new Map(rooms.filter((room) => room.color).map((room) => [room.color, room])), [rooms]);
+  const firstAvailableColor = () => ROOM_COLOR_OPTIONS.find((color) => !usedColors.has(color)) || '';
+  const colorTaken = (color) => Boolean(usedColors.has(color) && usedColors.get(color).id !== editId);
+  const colorValid = isRoomColor(form.color) && !colorTaken(form.color);
   const rows = useMemo(() => rooms.map((r) => ({ ...r, equipmentSearch: (r.equipmentIds || []).map((id) => equipment.find((device) => device.id === id)?.name || '').join(' ') })), [rooms, equipment]);
-  const add = () => { setEditId(null); setForm({ ...blank, code: makeRoomCode(), equipmentIds: [] }); setDeviceSearch(''); setOpen(true); };
-  const edit = (room) => { setEditId(room.id); setForm({ ...room, equipmentIds: room.equipmentIds || [] }); setDeviceSearch(''); setOpen(true); };
+  const add = () => { setEditId(null); setForm({ ...blank, color: firstAvailableColor(), code: makeRoomCode(), equipmentIds: [] }); setDeviceSearch(''); setOpen(true); };
+  const edit = (room) => { setEditId(room.id); setForm({ ...room, color: isRoomColor(room.color) ? room.color : firstAvailableColor(), equipmentIds: room.equipmentIds || [] }); setDeviceSearch(''); setOpen(true); };
   const change = (key) => (e) => setForm((prev) => ({ ...prev, [key]: e.target.value }));
   const toggleEquipment = (id) => setForm((prev) => ({ ...prev, equipmentIds: prev.equipmentIds.includes(id) ? prev.equipmentIds.filter((v) => v !== id) : [...prev.equipmentIds, id] }));
-  const valid = form.code.trim() && form.name.trim() && form.location.trim() && Number.isInteger(Number(form.capacity)) && Number(form.capacity) >= 1 && Number(form.capacity) <= 500;
+  const valid = form.code.trim() && form.name.trim() && form.location.trim() && Number.isInteger(Number(form.capacity)) && Number(form.capacity) >= 1 && Number(form.capacity) <= 500 && colorValid;
   const save = async () => {
     if (saving || !valid) return;
     setSaving(true);
@@ -72,7 +77,10 @@ export default function RoomManagementPage() {
       ].map(({ label, count, icon: Icon, color, bg }) => <Grid item xs={6} md={3} key={label}><Paper sx={{ ...border, p: 1.6, height: '100%' }}><Stack direction="row" alignItems="center" gap={1.2}><Box sx={{ bgcolor: bg, borderRadius: 2, p: 1, display: 'grid', placeItems: 'center' }}><Icon sx={{ fontSize: 21, color }} /></Box><Box><Typography sx={{ fontWeight: 850, color: '#18385D', fontSize: '1.4rem' }}>{count}</Typography><Typography sx={{ fontSize: '.69rem', color: '#7A8FA8', fontWeight: 650 }}>{label}</Typography></Box></Stack></Paper></Grid>)}
     </Grid>
     <Paper sx={{ ...border, overflow: 'hidden' }}><DataTable rows={rows} searchFields={[{ key: 'name', label: 'Room name' }, { key: 'equipmentSearch', label: 'Equipment' }]} filters={[{ key: 'status', label: 'Status', options: ROOM_FILTER_STATUS_OPTIONS }, { key: 'location', label: 'Location', options: [...new Set(rooms.map((r) => r.location).filter(Boolean))] }]} initialPageSize={10} columns={[
-      { key: 'name', label: 'Room name', render: (r) => <Typography sx={{ color: '#17345A', fontWeight: 750 }}>{r.name}</Typography> },
+      { key: 'name', label: 'Room name', render: (r) => <Stack direction="row" alignItems="center" gap={1}>
+        <Box aria-label={`Color for ${r.name}`} sx={{ flexShrink: 0, width: 15, height: 15, borderRadius: .75, bgcolor: roomAccent(r), border: '1px solid rgba(24,52,77,.16)' }}/>
+        <Typography sx={{ color: '#17345A', fontWeight: 750 }}>{r.name}</Typography>
+      </Stack> },
       { key: 'location', label: 'Location' },
       { key: 'capacity', label: 'Seats', align: 'center' },
       { key: 'equipmentSearch', label: 'Equipment', sortable: false, render: (r) => <EquipmentPills ids={r.equipmentIds} equipment={equipment} limit={2} small roomName={r.name} /> },
@@ -83,6 +91,31 @@ export default function RoomManagementPage() {
       <DialogTitle sx={{ bgcolor: '#F8FAFE', borderBottom: '1px solid #E6EDF5', py: 2, px: 2.6 }}><Typography sx={{ fontWeight: 850, fontSize: '1.05rem', color: '#18345D' }}>{editId ? 'Edit meeting room' : 'Create meeting room'}</Typography><Typography sx={{ color: '#8194A9', fontSize: '.75rem', mt: .35 }}>Room details and equipment assignments</Typography></DialogTitle>
       <DialogContent sx={{ px: { xs: 2, sm: 2.6 }, py: 2.3 }}><Stack spacing={2.1} sx={{ mt: 1 }}>
         <Grid container spacing={1.5}><Grid item xs={12} sm={12}><TextField size="small" required label="Room name" fullWidth value={form.name} onChange={change('name')} inputProps={{ maxLength: 120 }} /></Grid><Grid item xs={12} sm={5}><TextField size="small" required label="Location / floor" fullWidth value={form.location} onChange={change('location')} inputProps={{ maxLength: 160 }} /></Grid><Grid item xs={6} sm={3}><TextField size="small" required label="Capacity" type="number" fullWidth value={form.capacity} onChange={change('capacity')} inputProps={{ min: 1, max: 500, step: 1 }} /></Grid><Grid item xs={6} sm={4}><TextField size="small" label="Status" select fullWidth value={form.status} onChange={change('status')}><MenuItem value="ACTIVE">Available</MenuItem><MenuItem value="MAINTENANCE">Maintenance</MenuItem><MenuItem value="DISABLED">Disabled</MenuItem></TextField></Grid></Grid>
+        <Box sx={{ p: 1.7, border: '1px solid #DEE7F1', borderRadius: 2.5, bgcolor: '#FBFCFF' }}>
+          <Typography sx={{ fontWeight: 800, color: '#173A64', fontSize: '.84rem' }}>Room color <Typography component="span" color="error">*</Typography></Typography>
+          <Typography sx={{ fontSize: '.72rem', color: '#526A81', mb: 1.2 }}>Choose a soft, distinct room color. Colors already assigned to another room cannot be selected.</Typography>
+          <Box role="radiogroup" aria-label="Room color" sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+            {ROOM_COLOR_OPTIONS.map((color, index) => {
+              const usedBy = usedColors.get(color);
+              const taken = Boolean(usedBy && usedBy.id !== editId);
+              const selected = form.color === color;
+              return <Box key={color} component="button" type="button" role="radio" aria-checked={selected} aria-label={`Color ${index + 1}${taken ? `, used by ${usedBy.name}` : ''}`}
+                title={taken ? `Already used by ${usedBy.name}` : `Choose room color ${index + 1}`} disabled={taken}
+                onClick={() => setForm((prev) => ({ ...prev, color }))}
+                sx={{ position: 'relative', display: 'grid', placeItems: 'center', width: 37, height: 37, p: 0, borderRadius: '50%', border: selected ? '3px solid #173B63' : '2px solid #FFFFFF', outline: selected ? '2px solid #99B3D0' : '1px solid #CAD5E2', bgcolor: color, cursor: taken ? 'not-allowed' : 'pointer', opacity: taken ? .23 : 1, '&:focus-visible': { outline: '3px solid #2563EB' }, '&:hover': taken ? {} : { transform: 'scale(1.08)' } }}>
+                {selected && <Box sx={{ display: 'grid', placeItems: 'center', width: 18, height: 18, borderRadius: '50%', bgcolor: '#FFFFFF', color: '#173B63', fontSize: 13, fontWeight: 900 }}>✓</Box>}
+                {taken && <Box sx={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', fontWeight: 900, color: '#FFFFFF' }}>×</Box>}
+              </Box>;
+            })}
+          </Box>
+          <Stack direction="row" alignItems="center" gap={1} sx={{ mt: 1.2, p: 1, bgcolor: roomTint(form.color), border: '1px solid #E2E8F0', borderRadius: 1.5 }}>
+            <Box sx={{ width: 5, height: 28, borderRadius: 2, bgcolor: roomAccent({ color: form.color }) }}/>
+            <Box sx={{ minWidth: 0 }}><Typography sx={{ fontSize: '.75rem', fontWeight: 800, color: '#18344D' }} noWrap>{form.name || 'Room name preview'}</Typography>
+              <Typography sx={{ fontSize: '.69rem', color: '#465D70' }}>09:00–10:00 · Clear text on a light background</Typography></Box>
+          </Stack>
+          {!colorValid && <Typography sx={{ color: '#B42318', fontWeight: 650, fontSize: '.72rem', mt: 1 }}>Choose an available room color before saving.</Typography>}
+          <Typography sx={{ color: '#607489', fontSize: '.69rem', mt: .6 }}>{ROOM_COLOR_OPTIONS.length - [...usedColors.keys()].filter((color) => isRoomColor(color) && (editId ? usedColors.get(color).id !== editId : true)).length} colors available{editId ? ' including this room’s current color' : ''}.</Typography>
+        </Box>
         <TextField size="small" label="Description (optional)" multiline minRows={2} fullWidth value={form.description || ''} onChange={change('description')} inputProps={{ maxLength: 1000 }} />
         <Box sx={{ borderRadius: 2.5, border: '1px solid #E4EAF3', p: 1.7, bgcolor: '#FBFCFF' }}>
           <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ xs: 'stretch', sm: 'center' }} spacing={1}><Box><Typography sx={{ fontWeight: 800, fontSize: '.88rem', color: '#173A64' }}>Available equipment <Chip size="small" label={`${form.equipmentIds.length} selected`} sx={{ ml: .6, bgcolor: '#EAF2FF', color: '#2563EB', fontWeight: 750 }} /></Typography><Typography sx={{ fontSize: '.72rem', color: '#8494A8', mt: .25 }}>Select from the managed equipment catalog, not free-text names.</Typography></Box><TextField placeholder="Find equipment..." size="small" value={deviceSearch} onChange={(e) => setDeviceSearch(e.target.value)} sx={{ minWidth: { sm: 205 } }} InputProps={{ startAdornment: <InputAdornment position="start"><SearchRounded sx={{ color: '#96A9BD', fontSize: 18 }} /></InputAdornment> }} /></Stack>
