@@ -1,5 +1,5 @@
 import { ROOM_FORM_DEFAULTS } from '../constants/rooms.js';
-import { ROOM_COLOR_OPTIONS, isRoomColor, roomAccent, roomTint } from '../constants/roomColors.js';
+import { ROOM_COLOR_OPTIONS, ROOM_COLOR_NAMES, isRoomColor, isStoredHexColor, roomAccent, roomTint } from '../constants/roomColors.js';
 import { ROOM_STATUS, EQUIPMENT_STATUS, ROOM_FILTER_STATUS_OPTIONS } from '../constants/statuses.js';
 import { useMemo, useState } from 'react';
 import {
@@ -9,6 +9,7 @@ import {
 import AddRounded from '@mui/icons-material/AddRounded';
 import EditOutlined from '@mui/icons-material/EditOutlined';
 import DeleteOutlineOutlined from '@mui/icons-material/DeleteOutlineOutlined';
+import CheckRounded from '@mui/icons-material/CheckRounded';
 import SearchRounded from '@mui/icons-material/SearchRounded';
 import MeetingRoomOutlined from '@mui/icons-material/MeetingRoomOutlined';
 import PeopleOutlineRounded from '@mui/icons-material/PeopleOutlineRounded';
@@ -48,10 +49,12 @@ export default function RoomManagementPage() {
   const usedColors = useMemo(() => new Map(rooms.filter((room) => room.color).map((room) => [room.color, room])), [rooms]);
   const firstAvailableColor = () => ROOM_COLOR_OPTIONS.find((color) => !usedColors.has(color)) || '';
   const colorTaken = (color) => Boolean(usedColors.has(color) && usedColors.get(color).id !== editId);
-  const colorValid = isRoomColor(form.color) && !colorTaken(form.color);
+  const editingRoom = rooms.find((room) => room.id === editId);
+  const retainingSavedColor = Boolean(editId && editingRoom?.color === form.color && isStoredHexColor(form.color));
+  const colorValid = (isRoomColor(form.color) || retainingSavedColor) && !colorTaken(form.color);
   const rows = useMemo(() => rooms.map((r) => ({ ...r, equipmentSearch: (r.equipmentIds || []).map((id) => equipment.find((device) => device.id === id)?.name || '').join(' ') })), [rooms, equipment]);
   const add = () => { setEditId(null); setForm({ ...blank, color: firstAvailableColor(), code: makeRoomCode(), equipmentIds: [] }); setDeviceSearch(''); setOpen(true); };
-  const edit = (room) => { setEditId(room.id); setForm({ ...room, color: isRoomColor(room.color) ? room.color : firstAvailableColor(), equipmentIds: room.equipmentIds || [] }); setDeviceSearch(''); setOpen(true); };
+  const edit = (room) => { setEditId(room.id); setForm({ ...room, color: isStoredHexColor(room.color) ? room.color : firstAvailableColor(), equipmentIds: room.equipmentIds || [] }); setDeviceSearch(''); setOpen(true); };
   const change = (key) => (e) => setForm((prev) => ({ ...prev, [key]: e.target.value }));
   const toggleEquipment = (id) => setForm((prev) => ({ ...prev, equipmentIds: prev.equipmentIds.includes(id) ? prev.equipmentIds.filter((v) => v !== id) : [...prev.equipmentIds, id] }));
   const valid = form.code.trim() && form.name.trim() && form.location.trim() && Number.isInteger(Number(form.capacity)) && Number(form.capacity) >= 1 && Number(form.capacity) <= 500 && colorValid;
@@ -93,22 +96,32 @@ export default function RoomManagementPage() {
         <Grid container spacing={1.5}><Grid item xs={12} sm={12}><TextField size="small" required label="Room name" fullWidth value={form.name} onChange={change('name')} inputProps={{ maxLength: 120 }} /></Grid><Grid item xs={12} sm={5}><TextField size="small" required label="Location / floor" fullWidth value={form.location} onChange={change('location')} inputProps={{ maxLength: 160 }} /></Grid><Grid item xs={6} sm={3}><TextField size="small" required label="Capacity" type="number" fullWidth value={form.capacity} onChange={change('capacity')} inputProps={{ min: 1, max: 500, step: 1 }} /></Grid><Grid item xs={6} sm={4}><TextField size="small" label="Status" select fullWidth value={form.status} onChange={change('status')}><MenuItem value="ACTIVE">Available</MenuItem><MenuItem value="MAINTENANCE">Maintenance</MenuItem><MenuItem value="DISABLED">Disabled</MenuItem></TextField></Grid></Grid>
         <Box sx={{ p: 1.7, border: '1px solid #DEE7F1', borderRadius: 2.5, bgcolor: '#FBFCFF' }}>
           <Typography sx={{ fontWeight: 800, color: '#173A64', fontSize: '.84rem' }}>Room color <Typography component="span" color="error">*</Typography></Typography>
-          <Typography sx={{ fontSize: '.72rem', color: '#526A81', mb: 1.2 }}>Choose a soft, distinct room color. Colors already assigned to another room cannot be selected.</Typography>
+          <Typography sx={{ fontSize: '.72rem', color: '#526A81', mb: 1.2 }}>Choose a fresh room color. Each color can be assigned to only one room.</Typography>
+          {editingRoom && isStoredHexColor(editingRoom.color) && !isRoomColor(editingRoom.color) && <Typography sx={{ mb: 1.1, fontSize: '.74rem', color: '#526A81' }}>
+            This room uses an older color. It will remain unchanged unless you choose a new one.
+          </Typography>}
           <Box role="radiogroup" aria-label="Room color" sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-            {ROOM_COLOR_OPTIONS.map((color, index) => {
+            {editingRoom && isStoredHexColor(editingRoom.color) && !isRoomColor(editingRoom.color) && <Box component="button" type="button" role="radio" aria-checked={retainingSavedColor}
+              aria-label="Keep current saved room color" title="Current saved color" onClick={() => setForm((prev) => ({ ...prev, color: editingRoom.color }))}
+              sx={{ width: 37, height: 37, borderRadius: '50%', bgcolor: editingRoom.color, display: 'grid', placeItems: 'center', p: 0,
+                border: retainingSavedColor ? '3px solid #173B63' : '2px solid #FFFFFF', outline: retainingSavedColor ? '2px solid #99B3D0' : '1px solid #CAD5E2', cursor: 'pointer' }}>
+              {retainingSavedColor && <CheckRounded sx={{ color: '#fff', fontSize: 21 }} />}
+            </Box>}
+            {ROOM_COLOR_OPTIONS.map((color) => {
               const usedBy = usedColors.get(color);
               const taken = Boolean(usedBy && usedBy.id !== editId);
               const selected = form.color === color;
-              return <Box key={color} component="button" type="button" role="radio" aria-checked={selected} aria-label={`Color ${index + 1}${taken ? `, used by ${usedBy.name}` : ''}`}
-                title={taken ? `Already used by ${usedBy.name}` : `Choose room color ${index + 1}`} disabled={taken}
+              return <Box key={color} component="button" type="button" role="radio" aria-checked={selected} aria-label={`${ROOM_COLOR_NAMES[color]}${taken ? `, used by ${usedBy.name}` : ''}`}
+                title={taken ? `${ROOM_COLOR_NAMES[color]} — used by ${usedBy.name}` : ROOM_COLOR_NAMES[color]} disabled={taken}
                 onClick={() => setForm((prev) => ({ ...prev, color }))}
                 sx={{ position: 'relative', display: 'grid', placeItems: 'center', width: 37, height: 37, p: 0, borderRadius: '50%', border: selected ? '3px solid #173B63' : '2px solid #FFFFFF', outline: selected ? '2px solid #99B3D0' : '1px solid #CAD5E2', bgcolor: color, cursor: taken ? 'not-allowed' : 'pointer', opacity: taken ? .23 : 1, '&:focus-visible': { outline: '3px solid #2563EB' }, '&:hover': taken ? {} : { transform: 'scale(1.08)' } }}>
-                {selected && <Box sx={{ display: 'grid', placeItems: 'center', width: 18, height: 18, borderRadius: '50%', bgcolor: '#FFFFFF', color: '#173B63', fontSize: 13, fontWeight: 900 }}>✓</Box>}
+                {selected && <CheckRounded sx={{ color: '#fff', fontSize: 21, filter: 'drop-shadow(0 1px 1px rgba(0,0,0,.18))' }} />}
                 {taken && <Box sx={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', fontWeight: 900, color: '#FFFFFF' }}>×</Box>}
               </Box>;
             })}
           </Box>
-          <Stack direction="row" alignItems="center" gap={1} sx={{ mt: 1.2, p: 1, bgcolor: roomTint(form.color), border: '1px solid #E2E8F0', borderRadius: 1.5 }}>
+          <Typography sx={{ mt: 1.1, mb: .5, fontSize: '.72rem', fontWeight: 800, color: '#243F5B' }}>Selected: {ROOM_COLOR_NAMES[form.color] || (retainingSavedColor ? 'Existing saved color' : 'Choose a color')}</Typography>
+          <Stack direction="row" alignItems="center" gap={1} sx={{ mt: .4, p: 1, bgcolor: roomTint(form.color, .10), border: '1px solid #E2E8F0', borderRadius: 1.5 }}>
             <Box sx={{ width: 5, height: 28, borderRadius: 2, bgcolor: roomAccent({ color: form.color }) }}/>
             <Box sx={{ minWidth: 0 }}><Typography sx={{ fontSize: '.75rem', fontWeight: 800, color: '#18344D' }} noWrap>{form.name || 'Room name preview'}</Typography>
               <Typography sx={{ fontSize: '.69rem', color: '#465D70' }}>09:00–10:00 · Clear text on a light background</Typography></Box>

@@ -179,8 +179,8 @@ export default function CalendarPage() {
 
       <Box sx={{ overflowX: 'auto', overflowY: 'hidden', bgcolor: '#FFFFFF' }}>
         <Box sx={{ display: 'grid', gridTemplateColumns: '72px repeat(6, minmax(175px,1fr))', minWidth: 1170, bgcolor: '#fff' }}>
-          <Box sx={{ minHeight: 61, borderRight: '1px solid #E1E8F0', borderBottom: '1px solid #E1E8F0', bgcolor: '#F5F9FF' }} />
-          {days.map((date, dayIndex) => <Box key={date.format('YYYY-MM-DD')} sx={{ minHeight: 61, py: 1.0, textAlign: 'center', borderRight: dayIndex === days.length - 1 ? 'none' : '1px solid #E1E8F0', borderBottom: '1px solid #E1E8F0', bgcolor: date.isBefore(dayjs(), 'day') ? '#F0F3F7' : date.isSame(dayjs(), 'day') ? '#EAF3FF' : '#F6F9FE' }}>
+          <Box sx={{ minHeight: 61, borderRight: '1px solid #E1E8F0', borderBottom: '1px solid #E1E8F0', bgcolor: '#F8FAFF' }} />
+          {days.map((date, dayIndex) => <Box key={date.format('YYYY-MM-DD')} sx={{ minHeight: 61, py: 1.0, textAlign: 'center', borderRight: dayIndex === days.length - 1 ? 'none' : '1px solid #E1E8F0', borderBottom: '1px solid #E1E8F0', bgcolor: date.isSame(dayjs(), 'day') ? '#EFF6FF' : '#F8FAFF' }}>
             <Typography sx={{ fontSize: '.7rem', color: '#637B9A', fontWeight: 750 }}>{date.format('ddd')}</Typography>
             <Typography sx={{ mt: .15, fontSize: '1.01rem', color: '#173B63', fontWeight: 850 }}>{date.format('DD')}</Typography>
           </Box>)}
@@ -215,7 +215,7 @@ export default function CalendarPage() {
           {days.map((date, dayIndex) => {
             const iso = date.format('YYYY-MM-DD');
             const rows = calculateDayLayout(visibleBookings.filter((row) => row.date === iso));
-            return <Box key={iso} onClick={canCreateBooking ? (event) => openFromGrid(date, event) : undefined} sx={{ position: 'relative', height: TIMELINE_HEIGHT + BOTTOM_GUTTER, cursor: canCreateBooking ? 'crosshair' : 'default', borderRight: dayIndex === days.length - 1 ? 'none' : '1px solid #E1E8F0', backgroundColor: date.isBefore(dayjs(), 'day') ? '#FAFBFD' : '#fff', backgroundImage: `repeating-linear-gradient(to bottom, transparent 0, transparent ${HOUR_HEIGHT - 1}px, #EDF2F7 ${HOUR_HEIGHT - 1}px, #EDF2F7 ${HOUR_HEIGHT}px)` }}>
+            return <Box key={iso} onClick={canCreateBooking ? (event) => openFromGrid(date, event) : undefined} sx={{ position: 'relative', height: TIMELINE_HEIGHT + BOTTOM_GUTTER, cursor: canCreateBooking ? 'crosshair' : 'default', borderRight: dayIndex === days.length - 1 ? 'none' : '1px solid #E1E8F0', backgroundColor: date.isSame(dayjs(), 'day') ? '#FCFDFF' : '#FFFFFF', backgroundImage: `repeating-linear-gradient(to bottom, transparent 0, transparent ${HOUR_HEIGHT - 1}px, #EDF2F7 ${HOUR_HEIGHT - 1}px, #EDF2F7 ${HOUR_HEIGHT}px)` }}>
               {rows.map((row) => {
                 const [start, end] = String(row.time).split(' - ');
                 const startMinutes = minutesOf(start) - START_HOUR * 60;
@@ -247,21 +247,21 @@ export default function CalendarPage() {
                       position: 'absolute',
                       left: `calc(${(row.column / row.columns) * 100}% + 3px)`,
                       width: `calc(${100 / row.columns}% - 6px)`, top, height,
-                      minWidth: 0, bgcolor: roomTint(accent, .065),
-                      borderLeft: `4px solid ${accent}`, borderTop: '1px solid #DCE7F3',
-                      borderRight: '1px solid #DCE7F3', borderBottom: '1px solid #DCE7F3',
+                      minWidth: 0, bgcolor: roomTint(accent, .105),
+                      borderLeft: `4px solid ${accent}`, borderTop: '1px solid #E1EAF3',
+                      borderRight: '1px solid #E1EAF3', borderBottom: '1px solid #E1EAF3',
                       borderRadius: 1.5, px: .75, py: height < 26 ? .2 : .5,
                       overflow: 'hidden', cursor: 'pointer', zIndex: 2,
                       outline: navigation.bookingId === row.id ? '2px solid #2563EB' : 'none',
                       outlineOffset: navigation.bookingId === row.id ? 1 : 0,
                       boxShadow: '0 1px 3px rgba(31,69,112,.05)',
                       transition: 'background-color .13s ease, box-shadow .13s ease',
-                      '&:hover': { bgcolor: roomTint(accent, .11), boxShadow: '0 4px 14px rgba(23,59,99,.17)', zIndex: 3 },
+                      '&:hover': { bgcolor: roomTint(accent, .155), boxShadow: '0 4px 14px rgba(23,59,99,.17)', zIndex: 3 },
                       '&:focus-visible': { outline: '2px solid #1D6AD2', zIndex: 4 }
                     }}
                   >
                     <Stack direction="row" alignItems="center" justifyContent="space-between" gap={.35} sx={{ minWidth: 0 }}>
-                      <Typography title={row.title} sx={{ minWidth: 0, fontSize: '.745rem', fontWeight: 850, lineHeight: 1.19, color: '#152B49', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{row.title}</Typography>
+                      <Typography title={row.title} sx={{ minWidth: 0, fontSize: '.745rem', fontWeight: 850, lineHeight: 1.19, color: '#142C49', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{row.title}</Typography>
                       <Box component="span" role="img" aria-label={row.status} title={row.status} sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: style.border, flexShrink: 0, border: '1.5px solid #FFF', boxShadow: '0 0 0 1px rgba(24,52,77,.08)' }} />
                     </Stack>
                     {height >= 32 && <Stack direction="row" alignItems="center" spacing={.25} sx={{ mt: .3, minWidth: 0 }}>
