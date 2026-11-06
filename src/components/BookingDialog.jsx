@@ -41,7 +41,7 @@ export default function BookingDialog({
   defaultEndTime = ''
 }) {
   const { user: sessionUser } = useAuth();
-  const { equipment, bookings } = useAppData();
+  const { equipment } = useAppData();
   const [availability, setAvailability] = useState({ date: '', rows: [], loading: false, error: '' });
   const [form, setForm] = useState(defaultForm);
   const originalFormRef = useRef(null);
@@ -83,13 +83,13 @@ export default function BookingDialog({
     if (!open || !form.date) return undefined;
     let active = true;
     setAvailability({ date: form.date, rows: [], loading: true, error: '' });
-    globalApi.bookings.calendar(form.date, form.date).then((rows) => {
+    globalApi.bookings.occupied(form.date, booking?.id || '').then((rows) => {
       if (active) setAvailability({ date: form.date, rows: rows || [], loading: false, error: '' });
     }).catch((error) => {
       if (active) setAvailability({ date: form.date, rows: [], loading: false, error: error.message || 'Unable to check room schedule.' });
     });
     return () => { active = false; };
-  }, [open, form.date]);
+  }, [open, form.date, booking?.id]);
 
   const change = (key) => (event) => setForm((current) => ({ ...current, [key]: event.target.value }));
   const people = Number(form.participants);
@@ -104,21 +104,14 @@ export default function BookingDialog({
   const durationValid = timeValid && durationMinutes >= BOOKING_LIMITS.minMinutes && durationMinutes <= BOOKING_LIMITS.maxMinutes;
   const futureValid = Boolean(form.date && form.startTime) && dayjs(`${form.date}T${form.startTime}`).isAfter(dayjs());
   const busyBookings = availability.date === form.date ? availability.rows.filter((row) =>
-    row.status === BOOKING_STATUS.APPROVED && row.room?.id === form.roomId && row.id !== booking?.id
+    BOOKING_STATUS_GROUPS.BLOCKING_ROOM.includes(row.status) && row.roomId === form.roomId
   ) : [];
   const roomConflict = timeValid && busyBookings.some((row) => overlaps(
     minutesOf(form.startTime), minutesOf(form.endTime),
     minutesOf(formatTime(row.startAt)), minutesOf(formatTime(row.endAt))
   ));
-  const myConflict = Boolean(sessionUser) && timeValid && bookings.some((row) =>
-    row.id !== booking?.id && row.userId === sessionUser.id && row.date === form.date &&
-    BOOKING_STATUS_GROUPS.BLOCKING_USER.includes(row.status) && overlaps(
-      minutesOf(form.startTime), minutesOf(form.endTime),
-      minutesOf(String(row.time).split(' - ')[0]), minutesOf(String(row.time).split(' - ')[1])
-    )
-  );
   const valid = (!booking || booking.status === BOOKING_STATUS.PENDING) && form.title.trim() && selectedRoom && dateValid && futureValid && timeValid && durationValid &&
-    businessHoursValid && !sundaySelected && people > 0 && capacityValid && !roomConflict && !myConflict &&
+    businessHoursValid && !sundaySelected && people > 0 && capacityValid && !roomConflict &&
     !(availability.date === form.date && availability.loading);
   const submit = async () => {
     if (!valid || saving) return;
@@ -154,11 +147,10 @@ export default function BookingDialog({
         {timeValid && !businessHoursValid && <Typography sx={{ fontSize: '.72rem', color: '#D32F2F' }}>Bookings are allowed only from 07:00 to 18:00.</Typography>}
         {timeValid && !durationValid && <Alert severity="warning" sx={{ py: .2 }}>Duration must be between 15 minutes and 4 hours.</Alert>}
         {dateValid && !futureValid && <Alert severity="warning" sx={{ py: .2 }}>Start time must be in the future.</Alert>}
-        {myConflict && <Alert severity="error" sx={{ py: .2 }}>You already have a pending or approved meeting during this time.</Alert>}
-        {roomConflict && <Alert severity="error" sx={{ py: .2 }}>This room has an approved meeting in the selected time slot. Choose another time or room.</Alert>}
+        {roomConflict && <Alert severity="error" sx={{ py: .2 }}>This room already has a pending or approved booking in the selected time slot. Choose another time or room.</Alert>}
         {availability.loading && availability.date === form.date && <Typography variant="caption" color="text.secondary">Checking room availability...</Typography>}
         {availability.error && availability.date === form.date && <Alert severity="warning" sx={{ py: .2 }}>Live availability could not be checked. The server will check when you submit.</Alert>}
-        {busyBookings.length > 0 && !availability.loading && <Box sx={{ p: 1, bgcolor: '#F7F9FC', borderRadius: 1.5 }}><Typography sx={{ fontSize: '.73rem', fontWeight: 750, color: '#345A81' }}>Approved bookings in this room:</Typography>{busyBookings.map((row) => <Typography key={row.id} sx={{ fontSize: '.7rem', color: '#607890' }}>{formatTime(row.startAt)}–{formatTime(row.endAt)} · {row.title}</Typography>)}</Box>}
+        {busyBookings.length > 0 && !availability.loading && <Box sx={{ p: 1, bgcolor: '#F7F9FC', borderRadius: 1.5 }}><Typography sx={{ fontSize: '.73rem', fontWeight: 750, color: '#345A81' }}>Reserved / pending time slots in this room:</Typography>{busyBookings.map((row, i) => <Typography key={`${row.roomId}-${row.startAt}-${i}`} sx={{ fontSize: '.7rem', color: '#607890' }}>{formatTime(row.startAt)}–{formatTime(row.endAt)} · {row.status === BOOKING_STATUS.PENDING ? 'Pending approval' : 'Approved'}</Typography>)}</Box>}
         <Typography sx={{ fontSize: '.72rem', color: '#71849A' }}>Booking hours: Monday–Saturday, 07:00–18:00. Maximum 90 days ahead; 15–240 minutes per meeting.</Typography>
         <TextField label="Purpose / Note" size="small" multiline minRows={3} fullWidth value={form.note} onChange={change('note')} />
       </Stack>

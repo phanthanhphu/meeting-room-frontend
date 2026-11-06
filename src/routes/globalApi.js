@@ -63,6 +63,7 @@ export const globalApi = {
     mine: () => request('/api/bookings/mine'),
     get: (id) => request(`/api/bookings/${id}`),
     calendar: (from, to) => request(`/api/bookings/calendar/range?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`),
+    occupied: (date, excludeId = '') => request(`/api/bookings/occupied?date=${encodeURIComponent(date)}${excludeId ? `&excludeId=${encodeURIComponent(excludeId)}` : ''}`),
     create: (payload) => request('/api/bookings', { method: 'POST', body: jsonBody(payload) }),
     update: (id, payload) => request(`/api/bookings/${id}`, { method: 'PUT', body: jsonBody(payload) }),
     cancel: (id) => request(`/api/bookings/${id}/cancel`, { method: 'PATCH' }),

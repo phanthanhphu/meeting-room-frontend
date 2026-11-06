@@ -1,7 +1,7 @@
 import { BOOKING_DEFAULTS } from '../constants/booking.js';
 import TimeSelect from '../components/TimeSelect.jsx';
 import { formatDate, formatTime } from '../utils/date.js';
-import { BOOKING_STATUS, ROOM_STATUS } from '../constants/statuses.js';
+import { BOOKING_STATUS_GROUPS, ROOM_STATUS } from '../constants/statuses.js';
 import { ROOM_FILTER_DEFAULTS, ROOM_SLOT_DEFAULTS, ALL_FILTER_VALUE } from '../constants/rooms.js';
 import { TABLE_PAGE_SIZES } from '../constants/ui.js';
 import { useMemo, useRef, useState } from 'react';
@@ -48,7 +48,7 @@ export default function RoomsPage() {
   const [applied, setApplied] = useState(defaults);
   const visible = useMemo(() => rooms.filter((room) => {
     const search = `${room.code} ${room.name} ${room.location} ${(room.equipmentIds || []).map((id) => equipment.find((x) => x.id === id)?.name || '').join(' ')}`.toLowerCase();
-    const unavailable = appliedSlot && appliedSlot.rows.some((item) => item.status === BOOKING_STATUS.APPROVED && item.room?.id === room.id && overlaps(minutesOf(appliedSlot.start), minutesOf(appliedSlot.end), minutesOf(formatTime(item.startAt)), minutesOf(formatTime(item.endAt))));
+    const unavailable = appliedSlot && appliedSlot.rows.some((item) => BOOKING_STATUS_GROUPS.BLOCKING_ROOM.includes(item.status) && item.roomId === room.id && overlaps(minutesOf(appliedSlot.start), minutesOf(appliedSlot.end), minutesOf(formatTime(item.startAt)), minutesOf(formatTime(item.endAt))));
     return !unavailable && search.includes(applied.query.trim().toLowerCase()) && (applied.location === 'ALL' || room.location === applied.location) && (applied.status === 'ALL' || room.status === applied.status) && (applied.deviceId === 'ALL' || (room.equipmentIds || []).includes(applied.deviceId)) && (!applied.minCapacity || room.capacity >= Number(applied.minCapacity));
   }), [rooms, equipment, applied, appliedSlot]);
   const tableRows = useMemo(() => visible.map((room) => ({ ...room, equipmentCount: (room.equipmentIds || []).length })), [visible]);
@@ -66,7 +66,7 @@ export default function RoomsPage() {
       if (!dayjs(`${availableDate}T${startTime}`).isAfter(dayjs())) { setSlotError('Choose a future start time.'); return; }
       setSlotLoading(true); setSlotError(''); setAppliedSlot(null);
       try {
-        const rows = await globalApi.bookings.calendar(availableDate, availableDate);
+        const rows = await globalApi.bookings.occupied(availableDate);
         if (requestId === searchVersion.current) setAppliedSlot({ date: availableDate, start: startTime, end: endTime, rows: rows || [] });
       } catch (error) { if (requestId === searchVersion.current) setSlotError(error.message || 'Could not check availability.'); }
       finally { if (requestId === searchVersion.current) setSlotLoading(false); }
