@@ -64,7 +64,7 @@ export default function ReportsPage() {
     setExporting(true);
     try {
       downloadBookingReportXlsx({ rows: filtered, filters: appliedFilters, rooms, requesters });
-      showNotification(`Exported ${filtered.length} booking${filtered.length === 1 ? '' : 's'} to formatted Excel.`);
+      showNotification(`Exported ${filtered.length} matching booking${filtered.length === 1 ? '' : 's'} to one Excel sheet.`);
     } catch (error) {
       showNotification(error?.message || 'Unable to generate Excel report.', 'error');
     } finally {
@@ -92,7 +92,7 @@ export default function ReportsPage() {
   return <Box sx={{ p: .55 }}>
     <PageHeader
       title="Booking Reports"
-      subtitle="Filter bookings and export Excel with an overview, booking details, user totals, and a booking timeline"
+      subtitle="Filter bookings and export the matching booking list in one Excel sheet"
       actions={<Stack direction="row" spacing={.65}>
         <Button size="small" variant="contained" startIcon={<DownloadOutlined />} onClick={exportExcel} disabled={!filtered.length || exporting || loading}>{exporting ? 'Preparing Excel...' : 'Export Excel'}</Button>
       </Stack>}
